@@ -94,7 +94,8 @@ fun StudyScreen(
         }
 
         Card(
-            Modifier
+            onClick = { revealed = true },
+            modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .offset { IntOffset(dragX.roundToInt(), dragY.roundToInt()) }
@@ -118,8 +119,7 @@ fun StudyScreen(
                             dragY += dragAmount.y
                         }
                     )
-                },
-            onClick = { revealed = true }
+                }
         ) {
             Column(
                 Modifier.padding(20.dp).verticalScroll(rememberScrollState()),

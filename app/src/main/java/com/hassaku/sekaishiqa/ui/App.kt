@@ -192,7 +192,7 @@ fun HomeScreen(
 
 @Composable
 private fun ChapterRow(name: String, count: Int, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth(), onClick = onClick) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(name)
             Text("${count}問")

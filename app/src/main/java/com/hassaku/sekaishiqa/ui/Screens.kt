@@ -65,7 +65,7 @@ fun WordbooksScreen(
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(data.wordbooks) { book ->
-                Card(Modifier.fillMaxWidth(), onClick = { onOpenBook(book.id) }) {
+                Card(onClick = { onOpenBook(book.id) }, modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(book.name, style = MaterialTheme.typography.titleSmall)
                         Text("${book.questionIds.size}問")

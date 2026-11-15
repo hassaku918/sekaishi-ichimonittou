@@ -3,8 +3,8 @@ package com.hassaku.sekaishiqa.data
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromString
 import java.io.File
 import java.time.LocalDate
 
@@ -28,7 +28,7 @@ class AppStore(context: Context) {
         for (name in names) {
             runCatching {
                 val text = appContext.assets.open(name).bufferedReader().use { it.readText() }
-                loaded += json.decodeFromString<List<Question>>(text)
+                loaded += json.decodeFromString(ListSerializer(Question.serializer()), text)
             }
         }
         questions = loaded
@@ -37,7 +37,7 @@ class AppStore(context: Context) {
 
     private fun loadState(): StoreData {
         return runCatching {
-            if (stateFile.exists()) json.decodeFromString<StoreData>(stateFile.readText())
+            if (stateFile.exists()) json.decodeFromString(StoreData.serializer(), stateFile.readText())
             else StoreData()
         }.getOrDefault(StoreData())
     }
@@ -166,7 +166,7 @@ class AppStore(context: Context) {
 
     fun importJson(text: String): Boolean {
         return runCatching {
-            val parsed = json.decodeFromString<StoreData>(text)
+            val parsed = json.decodeFromString(StoreData.serializer(), text)
             update { parsed }
             true
         }.getOrDefault(false)
