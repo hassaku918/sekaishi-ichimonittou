@@ -83,7 +83,7 @@ jobs:
           mkdir -p /tmp/logrepo
           cd /tmp/logrepo
           git init -q
-          { echo "status: ${{ job.status }}"; echo "run: ${{ github.run_number }}"; echo "sha: ${{ github.sha }}"; echo; tail -50 "$GITHUB_WORKSPACE/build-log.txt" 2>/dev/null || echo "no log"; } > build-log.txt
+          { echo "status: ${{ job.status }}"; echo "run: ${{ github.run_number }}"; echo "sha: ${{ github.sha }}"; echo; echo "== errors =="; grep -E "^e: |error:|FAILED|What went wrong" -A 3 "$GITHUB_WORKSPACE/build-log.txt" 2>/dev/null | head -60; echo; echo "== tail =="; tail -30 "$GITHUB_WORKSPACE/build-log.txt" 2>/dev/null || echo "no log"; } > build-log.txt
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add build-log.txt
