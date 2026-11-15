@@ -126,6 +126,7 @@ fun AppRoot(store: AppStore) {
 private enum class Axis { YOKO, TATE, NENGO }
 private enum class StudyMode { ALL, ANKI, WEAK, FRESH }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     store: AppStore,
