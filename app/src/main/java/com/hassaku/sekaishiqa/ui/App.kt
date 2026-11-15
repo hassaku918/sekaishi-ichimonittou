@@ -36,8 +36,6 @@ sealed interface Route {
     data object Calendar : Route
     data object Settings : Route
     data class Study(val title: String, val queue: List<Question>, val yearMode: Boolean = false) : Route
-    data object EssayList : Route
-    data class EssayDetail(val essayId: String) : Route
     data class BookDetail(val bookId: String) : Route
 }
 
@@ -85,8 +83,7 @@ fun AppRoot(store: AppStore) {
             when (val r = route) {
                 is Route.Home -> HomeScreen(
                     store = store,
-                    onStudy = { title, queue, yearMode -> route = Route.Study(title, queue, yearMode) },
-                    onEssays = { route = Route.EssayList }
+                    onStudy = { title, queue, yearMode -> route = Route.Study(title, queue, yearMode) }
                 )
                 is Route.Wordbooks -> WordbooksScreen(
                     store = store,
@@ -102,16 +99,6 @@ fun AppRoot(store: AppStore) {
                     yearMode = r.yearMode,
                     onDone = { route = Route.Home }
                 )
-                is Route.EssayList -> EssayListScreen(
-                    store = store,
-                    onOpen = { route = Route.EssayDetail(it) },
-                    onBack = { route = Route.Home }
-                )
-                is Route.EssayDetail -> EssayDetailScreen(
-                    store = store,
-                    essayId = r.essayId,
-                    onBack = { route = Route.EssayList }
-                )
                 is Route.BookDetail -> BookDetailScreen(
                     store = store,
                     bookId = r.bookId,
@@ -126,8 +113,7 @@ fun AppRoot(store: AppStore) {
 @Composable
 fun HomeScreen(
     store: AppStore,
-    onStudy: (String, List<Question>, Boolean) -> Unit,
-    onEssays: () -> Unit
+    onStudy: (String, List<Question>, Boolean) -> Unit
 ) {
     val data by store.data.collectAsState()
     val due = remember(data) { store.dueQuestions(data) }
@@ -186,7 +172,6 @@ fun HomeScreen(
                         OutlinedButton(onClick = {
                             onStudy("年号", yearQuestions.shuffled().take(30), true)
                         }) { Text("年号 (${yearQuestions.size})") }
-                        OutlinedButton(onClick = onEssays) { Text("論述 (${store.essays.size})") }
                     }
                 }
             }

@@ -15,7 +15,6 @@ class AppStore(context: Context) {
     private val stateFile = File(appContext.filesDir, "store.json")
 
     val questions: List<Question>
-    val essays: List<Essay>
     val questionsById: Map<String, Question>
 
     private val _data = MutableStateFlow(loadState())
@@ -23,7 +22,10 @@ class AppStore(context: Context) {
 
     init {
         val loaded = mutableListOf<Question>()
-        for (name in listOf("questions_a.json", "questions_b.json", "questions_c.json")) {
+        val names = runCatching {
+            appContext.assets.list("")?.filter { it.startsWith("questions_") && it.endsWith(".json") }?.sorted()
+        }.getOrNull() ?: listOf("questions_a.json", "questions_b.json", "questions_c.json")
+        for (name in names) {
             runCatching {
                 val text = appContext.assets.open(name).bufferedReader().use { it.readText() }
                 loaded += json.decodeFromString<List<Question>>(text)
@@ -31,10 +33,6 @@ class AppStore(context: Context) {
         }
         questions = loaded
         questionsById = loaded.associateBy { it.id }
-        essays = runCatching {
-            val text = appContext.assets.open("essays.json").bufferedReader().use { it.readText() }
-            json.decodeFromString<List<Essay>>(text)
-        }.getOrDefault(emptyList())
     }
 
     private fun loadState(): StoreData {

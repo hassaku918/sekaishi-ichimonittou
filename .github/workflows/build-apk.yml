@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -61,3 +64,17 @@ jobs:
           name: build-log
           path: build-log.txt
           retention-days: 7
+
+      - name: Commit build log to build-logs branch on failure
+        if: failure()
+        run: |
+          set -e
+          mkdir -p /tmp/logrepo
+          cd /tmp/logrepo
+          git init -q
+          cp "$GITHUB_WORKSPACE/build-log.txt" build-log.txt || echo "no log" > build-log.txt
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add build-log.txt
+          git commit -q -m "build log for failed run"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:build-logs

@@ -16,7 +16,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -35,88 +34,6 @@ import com.hassaku.sekaishiqa.data.AppStore
 import com.hassaku.sekaishiqa.data.Grade
 import com.hassaku.sekaishiqa.data.Question
 import java.time.LocalDate
-
-// ---------------- Essays ----------------
-
-@Composable
-fun EssayListScreen(store: AppStore, onOpen: (String) -> Unit, onBack: () -> Unit) {
-    val data by store.data.collectAsState()
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = onBack) { Text("戻る") }
-            Text("論述", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.weight(1f))
-        }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(store.essays) { essay ->
-                Card(Modifier.fillMaxWidth(), onClick = { onOpen(essay.id) }) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(essay.theme, style = MaterialTheme.typography.titleSmall)
-                        Text(essay.prompt)
-                        val score = data.essayScores[essay.id]
-                        if (score != null) Text("前回の自己採点: ${gradeLabel(score)}")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun EssayDetailScreen(store: AppStore, essayId: String, onBack: () -> Unit) {
-    val essay = store.essays.firstOrNull { it.id == essayId }
-    var showAnswer by remember { mutableStateOf(false) }
-    var tapped by remember { mutableStateOf<Set<String>>(emptySet()) }
-    Column(
-        Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        TextButton(onClick = onBack) { Text("戻る") }
-        if (essay == null) {
-            Text("論述が見つかりません。")
-            return
-        }
-        Text(essay.theme, style = MaterialTheme.typography.titleLarge)
-        Text(essay.prompt)
-        if (!showAnswer) {
-            Button(onClick = { showAnswer = true }) { Text("模範解答を見る") }
-        } else {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("模範解答", style = MaterialTheme.typography.titleSmall)
-                    Text(essay.answer)
-                    Text("採点キーワード（書けていたらタップ）", style = MaterialTheme.typography.titleSmall)
-                    essay.keywords.chunked(3).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            row.forEach { kw ->
-                                FilterChip(
-                                    selected = kw in tapped,
-                                    onClick = { tapped = if (kw in tapped) tapped - kw else tapped + kw },
-                                    label = { Text(kw) }
-                                )
-                            }
-                        }
-                    }
-                    val ratio = if (essay.keywords.isEmpty()) 0
-                        else tapped.size * 100 / essay.keywords.size
-                    Text("キーワード達成率: ${ratio}%（${tapped.size}/${essay.keywords.size}）")
-                }
-            }
-            Text("自己採点")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { store.recordEssay(essay.id, Grade.UNKNOWN); onBack() }) { Text("できない") }
-                OutlinedButton(onClick = { store.recordEssay(essay.id, Grade.UNSURE); onBack() }) { Text("まあまあ") }
-                Button(onClick = { store.recordEssay(essay.id, Grade.KNOWN); onBack() }) { Text("できた") }
-            }
-        }
-    }
-}
-
-private fun gradeLabel(name: String): String = when (name) {
-    Grade.KNOWN.name -> "できた"
-    Grade.UNSURE.name -> "まあまあ"
-    else -> "できない"
-}
 
 // ---------------- Wordbooks ----------------
 
