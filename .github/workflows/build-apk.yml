@@ -65,16 +65,27 @@ jobs:
           path: build-log.txt
           retention-days: 7
 
-      - name: Commit build log to build-logs branch on failure
-        if: failure()
+      - name: Publish APK to release on success
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          ls -la "$APK"
+          gh release delete apk-latest --yes --cleanup-tag || true
+          gh release create apk-latest "$APK" --title "世界史一問一答 APK (debug)" --notes "Latest debug build from main. Run ${{ github.run_number }}."
+
+      - name: Commit build result to build-logs branch
+        if: always()
         run: |
           set -e
           mkdir -p /tmp/logrepo
           cd /tmp/logrepo
           git init -q
-          cp "$GITHUB_WORKSPACE/build-log.txt" build-log.txt || echo "no log" > build-log.txt
+          { echo "status: ${{ job.status }}"; echo "run: ${{ github.run_number }}"; echo "sha: ${{ github.sha }}"; echo; tail -50 "$GITHUB_WORKSPACE/build-log.txt" 2>/dev/null || echo "no log"; } > build-log.txt
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add build-log.txt
-          git commit -q -m "build log for failed run"
+          git commit -q -m "build result: ${{ job.status }}"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:build-logs
