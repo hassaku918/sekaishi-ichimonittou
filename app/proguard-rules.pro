@@ -5,3 +5,6 @@
 -keepclasseswithmembers class * {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# Keep the app's serializable model classes and their generated serializers
+-keep class com.hassaku.sekaishiqa.data.** { *; }

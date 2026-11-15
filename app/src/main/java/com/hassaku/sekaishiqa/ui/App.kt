@@ -27,6 +27,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.launch
 import com.hassaku.sekaishiqa.data.AppStore
 import com.hassaku.sekaishiqa.data.Question
 
@@ -42,7 +49,6 @@ sealed interface Route {
 @Composable
 fun AppRoot(store: AppStore) {
     var route by remember { mutableStateOf<Route>(Route.Home) }
-    val data by store.data.collectAsState()
 
     val topLevel = route is Route.Home || route is Route.Wordbooks ||
         route is Route.Calendar || route is Route.Settings
@@ -83,7 +89,8 @@ fun AppRoot(store: AppStore) {
             when (val r = route) {
                 is Route.Home -> HomeScreen(
                     store = store,
-                    onStudy = { title, queue, yearMode -> route = Route.Study(title, queue, yearMode) }
+                    onStudy = { title, queue, yearMode -> route = Route.Study(title, queue, yearMode) },
+                    onOpenWordbooks = { route = Route.Wordbooks }
                 )
                 is Route.Wordbooks -> WordbooksScreen(
                     store = store,
@@ -110,93 +117,199 @@ fun AppRoot(store: AppStore) {
     }
 }
 
+
 @Composable
 fun HomeScreen(
     store: AppStore,
-    onStudy: (String, List<Question>, Boolean) -> Unit
+    onStudy: (String, List<Question>, Boolean) -> Unit,
+    onOpenWordbooks: () -> Unit
 ) {
     val data by store.data.collectAsState()
     val due = remember(data) { store.dueQuestions(data) }
     val weak = remember(data) { store.questions.filter { store.isWeak(it, data) } }
     val fresh = remember(data) { store.questions.filter { !(data.progress[it.id]?.seen ?: false) } }
     val graduated = remember(data) { data.progress.values.count { it.graduated } }
-    val todayLog = data.logs[store.today()]
-    val chapters = remember { store.questions.map { it.chapter }.distinct() }
-    val regions = remember { store.questions.map { it.region }.distinct() }
-    val yearQuestions = remember { store.questions.filter { it.year != null } }
+    val streak = remember(data) { store.streakDays(data) }
+    val chapterStats = remember(data) { store.chapterStats(data) }
+    val regionStats = remember(data) { store.regionStats(data) }
+    val todayAnswered = data.logs[store.today()]?.answered ?: 0
+    val chapters = store.chapters
+    val regions = store.regions
+
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val yokoHeaderIndex = 3
+    val tateHeaderIndex = yokoHeaderIndex + 1 + chapters.size
 
     LazyColumn(
-        Modifier.fillMaxSize().padding(16.dp),
+        state = listState,
+        modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Text("世界史一問一答", style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "連続記録 ${store.streakDays(data)}日 / 今日 ${todayLog?.answered ?: 0}問（目標 ${AppStore.DAILY_GOAL}問）" +
-                    " / 卒業 ${graduated}問 / 全 ${store.questions.size}問"
-            )
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A237E)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "世界史一問一答",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text("全 ${store.questions.size}問 / 年号 ${store.yearQuestions.size}問", color = Color(0xFFC5CAE9))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("連続記録", style = MaterialTheme.typography.labelSmall, color = Color(0xFFC5CAE9))
+                            Text("${streak}日", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                        }
+                        Column {
+                            Text("今日", style = MaterialTheme.typography.labelSmall, color = Color(0xFFC5CAE9))
+                            Text(
+                                "${todayAnswered} / ${AppStore.DAILY_GOAL}問",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = Color.White
+                            )
+                        }
+                        Column {
+                            Text("卒業", style = MaterialTheme.typography.labelSmall, color = Color(0xFFC5CAE9))
+                            Text("${graduated}問", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                        }
+                    }
+                    LinearProgressIndicator(
+                        progress = { (todayAnswered.toFloat() / AppStore.DAILY_GOAL).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color(0xFFFFC107),
+                        trackColor = Color(0xFF3949AB)
+                    )
+                    Text(
+                        if (todayAnswered >= AppStore.DAILY_GOAL) "今日の目標達成。連続記録がのびます"
+                        else "あと ${AppStore.DAILY_GOAL - todayAnswered}問で今日の目標達成",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFFC5CAE9)
+                    )
+                }
+            }
         }
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("忘れる前に、もう一度", style = MaterialTheme.typography.titleMedium)
-                    Text("復習期限が来た問題: ${due.size}問")
+                    Text("忘れる前に、もう一度", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("復習期限 ${due.size}問 ・ ニガテ ${weak.size}問 ・ 未学習 ${fresh.size}問")
+                    Button(
+                        onClick = { onStudy("暗記（復習）", (due + fresh).take(30), false) },
+                        enabled = due.isNotEmpty() || fresh.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("暗記をはじめる") }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { onStudy("暗記（復習）", (due + fresh).take(30), false) },
-                            enabled = due.isNotEmpty() || fresh.isNotEmpty()
-                        ) { Text("暗記をはじめる") }
+                        OutlinedButton(
+                            onClick = { onStudy("すべて", store.questions.shuffled().take(30), false) },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("すべて") }
                         OutlinedButton(
                             onClick = { onStudy("ニガテのみ", weak.shuffled().take(30), false) },
-                            enabled = weak.isNotEmpty()
-                        ) { Text("ニガテのみ (${weak.size})") }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            enabled = weak.isNotEmpty(),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("ニガテのみ") }
                         OutlinedButton(
                             onClick = { onStudy("未学習", fresh.shuffled().take(30), false) },
-                            enabled = fresh.isNotEmpty()
-                        ) { Text("未学習 (${fresh.size})") }
-                        OutlinedButton(
-                            onClick = { onStudy("すべて", store.questions.shuffled().take(30), false) }
-                        ) { Text("すべて") }
+                            enabled = fresh.isNotEmpty(),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("未学習") }
                     }
                 }
             }
         }
         item {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("切り口", style = MaterialTheme.typography.titleMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = {
-                            onStudy("年号", yearQuestions.shuffled().take(30), true)
-                        }) { Text("年号 (${yearQuestions.size})") }
-                    }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ModeCard(
+                        title = "ヨコ",
+                        subtitle = "単元の順に通して学ぶ",
+                        color = Color(0xFF1565C0),
+                        modifier = Modifier.weight(1f)
+                    ) { scope.launch { listState.animateScrollToItem(yokoHeaderIndex) } }
+                    ModeCard(
+                        title = "タテ",
+                        subtitle = "国・地域ごとにつなげて学ぶ",
+                        color = Color(0xFF00838F),
+                        modifier = Modifier.weight(1f)
+                    ) { scope.launch { listState.animateScrollToItem(tateHeaderIndex) } }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ModeCard(
+                        title = "年号",
+                        subtitle = "出来事と年代をセットで（${store.yearQuestions.size}問）",
+                        color = Color(0xFFEF6C00),
+                        modifier = Modifier.weight(1f)
+                    ) { onStudy("年号", store.yearQuestions.shuffled().take(30), true) }
+                    ModeCard(
+                        title = "my単語帳",
+                        subtitle = "しおりで集めた自分だけの単語帳",
+                        color = Color(0xFF6A1B9A),
+                        modifier = Modifier.weight(1f)
+                    ) { onOpenWordbooks() }
                 }
             }
         }
-        item { Text("ヨコ（単元順）", style = MaterialTheme.typography.titleMedium) }
-        items(chapters) { chapter ->
-            val qs = store.questions.filter { it.chapter == chapter }
-            ChapterRow(chapter, qs.size) { onStudy(chapter, qs, false) }
+        item {
+            Text("ヨコ（単元順）", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
-        item { Text("タテ（地域別）", style = MaterialTheme.typography.titleMedium) }
-        items(regions) { region ->
-            val qs = store.questions.filter { it.region == region }
-            ChapterRow(region, qs.size) { onStudy(region, qs.shuffled(), false) }
+        items(chapters, key = { "ch-$it" }) { chapter ->
+            val qs = store.byChapter[chapter].orEmpty()
+            val st = chapterStats[chapter]
+            ProgressRow(chapter, qs.size, st?.get(0) ?: 0, st?.get(1) ?: 0) { onStudy(chapter, qs, false) }
+        }
+        item {
+            Text("タテ（地域別）", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+        items(regions, key = { "rg-$it" }) { region ->
+            val qs = store.byRegion[region].orEmpty()
+            val st = regionStats[region]
+            ProgressRow(region, qs.size, st?.get(0) ?: 0, st?.get(1) ?: 0) { onStudy(region, qs.shuffled(), false) }
         }
         item { Spacer(Modifier.height(8.dp)) }
     }
 }
 
 @Composable
-private fun ChapterRow(name: String, count: Int, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(name)
-            Text("${count}問")
+private fun ModeCard(
+    title: String,
+    subtitle: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = color),
+        modifier = modifier.height(96.dp)
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(subtitle, style = MaterialTheme.typography.labelMedium, color = Color(0xE6FFFFFF))
         }
     }
-    HorizontalDivider()
+}
+
+@Composable
+private fun ProgressRow(name: String, count: Int, seen: Int, graduated: Int, onClick: () -> Unit) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(name, fontWeight = FontWeight.Medium)
+                Text("${count}問")
+            }
+            LinearProgressIndicator(
+                progress = { if (count == 0) 0f else seen.toFloat() / count },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                "学習済み ${seen}問 ・ 卒業 ${graduated}問",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }

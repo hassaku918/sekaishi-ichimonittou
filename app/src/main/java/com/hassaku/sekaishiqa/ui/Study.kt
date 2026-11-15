@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -29,13 +28,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.hassaku.sekaishiqa.data.AppStore
 import com.hassaku.sekaishiqa.data.Grade
 import com.hassaku.sekaishiqa.data.Question
-import kotlin.math.roundToInt
 
 @Composable
 fun StudyScreen(
@@ -45,7 +43,6 @@ fun StudyScreen(
     yearMode: Boolean,
     onDone: () -> Unit
 ) {
-    val data by store.data.collectAsState()
     var index by remember { mutableIntStateOf(0) }
     var revealed by remember { mutableStateOf(false) }
     var known by remember { mutableIntStateOf(0) }
@@ -98,7 +95,7 @@ fun StudyScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .offset { IntOffset(dragX.roundToInt(), dragY.roundToInt()) }
+                .graphicsLayer { translationX = dragX; translationY = dragY }
                 .pointerInput(q.id, revealed) {
                     detectDragGestures(
                         onDragEnd = {
@@ -168,11 +165,18 @@ fun StudyScreen(
         }
     }
 
-    if (showBookmark) {
-        val q = queue[index]
-        var newName by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showBookmark = false },
+    if (showBookmark && index < queue.size) {
+        BookmarkDialog(store = store, question = queue[index], onDismiss = { showBookmark = false })
+    }
+}
+
+@Composable
+private fun BookmarkDialog(store: AppStore, question: Question, onDismiss: () -> Unit) {
+    val data by store.data.collectAsState()
+    val q = question
+    var newName by remember { mutableStateOf("") }
+    AlertDialog(
+            onDismissRequest = onDismiss,
             title = { Text("my単語帳に入れる") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -203,10 +207,9 @@ fun StudyScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showBookmark = false }) { Text("閉じる") }
+                TextButton(onClick = onDismiss) { Text("閉じる") }
             }
         )
-    }
 }
 
 fun formatYear(year: Int?): String = when {

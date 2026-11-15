@@ -28,7 +28,18 @@ Memora X 世界史一問一答（com.ichinari.sekaishi）の学習フローを�
 - 学習データの書き出し・読み込み（JSON共有／貼り付け）、リセット
 
 ## ビルド
-GitHub Actions（Build Debug APK）で `app-debug.apk` を artifact として取得する。
+GitHub Actions（Build Release APK）で署名付きリリース版 `app-release.apk` をビルドし、
+Releases の `apk-latest` タグと artifact から取得する。
+署名は `app/signing/sekaishi.jks` の固定鍵に統一しているため、以後は上書きインストールで更新できる
+（v0.1.0 のデバッグ署名版からは署名が異なるため、一度だけ入れ替えが必要）。
+
+## v0.2.0 の変更
+- 軽量化: 学習データの保存をバックグラウンド書き込み化（判定ごとのメインスレッドIOを解消）、
+  章・地域ごとの問題リストと統計を事前計算に変更、学習画面の不要な再描画を削減、
+  リリースビルド（R8最適化＋リソース圧縮）に移行
+- ホーム画面を本家の構成に寄せた: 連続記録ヘッダー、「忘れる前に、もう一度」の復習カード、
+  ヨコ／タテ／年号／my単語帳の色付きモードカード、章・地域ごとの進捗バー
+- アイコンを変更
 
 ## データの追加
 `app/src/main/assets/questions_*.json` に問題を追加する（起動時に自動で読み込む）。

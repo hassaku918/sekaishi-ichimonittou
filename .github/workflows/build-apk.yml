@@ -1,4 +1,4 @@
-name: Build Debug APK
+name: Build Release APK
 
 on:
   push:
@@ -44,7 +44,7 @@ jobs:
           fi
           chmod +x gradlew
 
-      - name: Build Debug APK
+      - name: Build Release APK
         run: |
           set -o pipefail
           ./gradlew :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee build-log.txt
@@ -53,8 +53,8 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: sekaishi-qa-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: sekaishi-qa-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
           retention-days: 14
 
       - name: Upload build log on failure
@@ -71,10 +71,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          APK=app/build/outputs/apk/debug/app-debug.apk
+          APK=app/build/outputs/apk/release/app-release.apk
           ls -la "$APK"
           gh release delete apk-latest --yes --cleanup-tag || true
-          gh release create apk-latest "$APK" --title "世界史一問一答 APK (debug)" --notes "Latest debug build from main. Run ${{ github.run_number }}."
+          gh release create apk-latest "$APK" --title "世界史一問一答 APK" --notes "Latest signed release build from main. Run ${{ github.run_number }}."
 
       - name: Commit build result to build-logs branch
         if: always()

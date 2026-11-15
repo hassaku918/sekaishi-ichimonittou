@@ -7,18 +7,46 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.time.LocalDate
+import java.util.concurrent.Executors
 
 class AppStore(context: Context) {
 
     private val appContext = context.applicationContext
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val stateJson = Json { ignoreUnknownKeys = true }
     private val stateFile = File(appContext.filesDir, "store.json")
 
     val questions: List<Question>
     val questionsById: Map<String, Question>
+    val chapters: List<String>
+    val regions: List<String>
+    val byChapter: Map<String, List<Question>>
+    val byRegion: Map<String, List<Question>>
+    val yearQuestions: List<Question>
 
     private val _data = MutableStateFlow(loadState())
     val data: StateFlow<StoreData> = _data
+
+    // State persistence runs on a single background thread and coalesces
+    // bursts (e.g. rapid grading) into one write of the latest snapshot,
+    // so the main thread never blocks on file IO.
+    private val writeExecutor = Executors.newSingleThreadExecutor()
+    private val writeLock = Any()
+    private var writeQueued = false
+
+    private fun persist() {
+        synchronized(writeLock) {
+            if (writeQueued) return
+            writeQueued = true
+        }
+        writeExecutor.execute {
+            synchronized(writeLock) { writeQueued = false }
+            val snapshot = _data.value
+            runCatching {
+                stateFile.writeText(stateJson.encodeToString(StoreData.serializer(), snapshot))
+            }
+        }
+    }
 
     init {
         val loaded = mutableListOf<Question>()
@@ -33,19 +61,23 @@ class AppStore(context: Context) {
         }
         questions = loaded
         questionsById = loaded.associateBy { it.id }
+        chapters = loaded.map { it.chapter }.distinct()
+        regions = loaded.map { it.region }.distinct()
+        byChapter = loaded.groupBy { it.chapter }
+        byRegion = loaded.groupBy { it.region }
+        yearQuestions = loaded.filter { it.year != null }
     }
 
     private fun loadState(): StoreData {
         return runCatching {
-            if (stateFile.exists()) json.decodeFromString(StoreData.serializer(), stateFile.readText())
+            if (stateFile.exists()) stateJson.decodeFromString(StoreData.serializer(), stateFile.readText())
             else StoreData()
         }.getOrDefault(StoreData())
     }
 
     private fun update(transform: (StoreData) -> StoreData) {
-        val next = transform(_data.value)
-        _data.value = next
-        runCatching { stateFile.writeText(json.encodeToString(StoreData.serializer(), next)) }
+        _data.value = transform(_data.value)
+        persist()
     }
 
     fun today(): Long = LocalDate.now().toEpochDay()
@@ -119,6 +151,22 @@ class AppStore(context: Context) {
     }
 
     fun dueQuestions(data: StoreData): List<Question> = questions.filter { isDue(it, data) }
+
+    // Per-group [seen, graduated] counts in a single pass over progress.
+    private fun statsBy(data: StoreData, key: (Question) -> String): Map<String, IntArray> {
+        val out = mutableMapOf<String, IntArray>()
+        for ((id, p) in data.progress) {
+            if (!p.seen) continue
+            val q = questionsById[id] ?: continue
+            val arr = out.getOrPut(key(q)) { IntArray(2) }
+            arr[0]++
+            if (p.graduated) arr[1]++
+        }
+        return out
+    }
+
+    fun chapterStats(data: StoreData): Map<String, IntArray> = statsBy(data) { it.chapter }
+    fun regionStats(data: StoreData): Map<String, IntArray> = statsBy(data) { it.region }
 
     fun streakDays(data: StoreData): Int {
         var day = today()

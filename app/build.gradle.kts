@@ -13,13 +13,24 @@ android {
         applicationId = "com.hassaku.sekaishiqa"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+
+    signingConfigs {
+        create("fixed") {
+            storeFile = rootProject.file("app/signing/sekaishi.jks")
+            storePassword = "sekaishi918"
+            keyAlias = "sekaishi"
+            keyPassword = "sekaishi918"
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("fixed")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
