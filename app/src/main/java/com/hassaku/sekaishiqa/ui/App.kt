@@ -136,16 +136,16 @@ fun AppRoot(store: AppStore) {
                     store = store,
                     onBack = { route = Route.Home },
                     onOpenBook = { route = Route.BookDetail(it) },
-                    onStudy = { title, queue ->
-                        route = Route.Study(title, "一問一答・my単語帳", queue, false)
+                    onStudy = { title, queue, yearMode ->
+                        route = Route.Study(title, "一問一答・my単語帳", queue, yearMode)
                     }
                 )
                 is Route.BookDetail -> BookDetailScreen(
                     store = store,
                     bookId = r.bookId,
                     onBack = { route = Route.Wordbooks },
-                    onStudy = { title, queue ->
-                        route = Route.Study(title, "一問一答・my単語帳", queue, false)
+                    onStudy = { title, queue, yearMode ->
+                        route = Route.Study(title, "一問一答・my単語帳", queue, yearMode)
                     }
                 )
                 Route.Calendar -> CalendarScreen(store = store, onBack = { route = Route.Home })
