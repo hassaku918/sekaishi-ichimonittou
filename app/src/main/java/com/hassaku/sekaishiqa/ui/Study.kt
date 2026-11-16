@@ -1,13 +1,14 @@
 package com.hassaku.sekaishiqa.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,6 +44,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,8 +52,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -62,6 +64,8 @@ import com.hassaku.sekaishiqa.data.Grade
 import com.hassaku.sekaishiqa.data.Progress
 import com.hassaku.sekaishiqa.data.Question
 import kotlin.math.abs
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val OverlayGreen = Color(0xFF79C57E)
 private val OverlayGray = Color(0xFF9AA0A8)
@@ -73,6 +77,12 @@ private fun levelLabel(level: Int): Pair<String, Color> = when (level) {
     1 -> "Lv1 共通テスト向け基礎" to Color(0xFF12B76A)
     2 -> "Lv2 私大向け応用" to Color(0xFF2F6BFF)
     else -> "Lv3 早慶向け難題" to Color(0xFFF79009)
+}
+
+private fun overlayFor(grade: Grade): Triple<Color, String, String> = when (grade) {
+    Grade.KNOWN -> Triple(OverlayGreen, "✓", "合っていた")
+    Grade.UNKNOWN -> Triple(OverlayGray, "✕", "間違っていた")
+    Grade.UNSURE -> Triple(OverlayBlue, "〜", "まあまあ")
 }
 
 @Composable
@@ -90,9 +100,13 @@ fun StudyScreen(
     var unsure by remember { mutableIntStateOf(0) }
     var unknown by remember { mutableIntStateOf(0) }
     var showBookmark by remember { mutableStateOf(false) }
-    var dragX by remember { mutableStateOf(0f) }
-    var dragY by remember { mutableStateOf(0f) }
+    var busy by remember { mutableStateOf(false) }
+    var exitGrade by remember { mutableStateOf<Grade?>(null) }
+    var flash by remember { mutableStateOf<Color?>(null) }
     val undoStack = remember { mutableStateListOf<UndoEntry>() }
+    val offsetX = remember { Animatable(0f) }
+    val offsetY = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
 
     fun applyGrade(q: Question, g: Grade) {
         val prev = store.data.value.progress[q.id]
@@ -104,8 +118,6 @@ fun StudyScreen(
             Grade.UNKNOWN -> unknown++
         }
         revealed = false
-        dragX = 0f
-        dragY = 0f
         index++
     }
 
@@ -119,8 +131,10 @@ fun StudyScreen(
         }
         index--
         revealed = true
-        dragX = 0f
-        dragY = 0f
+        scope.launch {
+            offsetX.snapTo(0f)
+            offsetY.snapTo(0f)
+        }
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
@@ -131,7 +145,7 @@ fun StudyScreen(
                     Text(subtitle, fontSize = 12.sp, color = InkTextSub)
                 }
             }
-            CircleButton(glyph = "↩", enabled = undoStack.isNotEmpty(), onClick = { undo() })
+            CircleButton(glyph = "↩", enabled = undoStack.isNotEmpty() && !busy, onClick = { undo() })
             Spacer(Modifier.size(8.dp))
             CircleButton(glyph = "×", enabled = true, onClick = onDone)
             Spacer(Modifier.size(10.dp))
@@ -190,39 +204,31 @@ fun StudyScreen(
         val q = queue[index]
         val questionFade by animateFloatAsState(
             targetValue = if (revealed) 1f else 0f,
-            animationSpec = tween(220),
+            animationSpec = tween(150),
             label = "questionFade"
         )
         val questionColor = lerp(InkText, InkTextSub, questionFade)
 
-        // Direction overlay (like the original: the whole area tints while swiping)
+        val dragX = offsetX.value
+        val dragY = offsetY.value
         val dragMag = maxOf(abs(dragX), abs(dragY))
-        val overlay = when {
-            dragX > 40f && abs(dragX) >= abs(dragY) -> Triple(OverlayGreen, "✓", "合っていた")
-            dragX < -40f && abs(dragX) >= abs(dragY) -> Triple(OverlayGray, "✕", "間違っていた")
-            dragY > 40f -> Triple(OverlayBlue, "〜", "まあまあ")
+        val activeGrade: Grade? = when {
+            exitGrade != null -> exitGrade
+            abs(dragX) >= abs(dragY) && dragX > 40f -> Grade.KNOWN
+            abs(dragX) >= abs(dragY) && dragX < -40f -> Grade.UNKNOWN
+            dragY > 40f -> Grade.UNSURE
             else -> null
         }
+        val overlay = activeGrade?.let { overlayFor(it) }
+        val overlayAlpha = if (exitGrade != null) 0.85f else (dragMag / 220f).coerceIn(0f, 0.85f)
 
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            if (overlay != null) {
+            // Grade color wash behind the card while it flies off (as in the original).
+            if (flash != null) {
                 Box(
                     Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp))
-                        .background(overlay.first.copy(alpha = (dragMag / 260f).coerceIn(0f, 0.92f))),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            Modifier.size(84.dp).clip(CircleShape)
-                                .border(3.dp, Color.White, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(overlay.second, fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Text(overlay.third, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
+                        .background(flash!!.copy(alpha = 0.45f))
+                )
             }
 
             Card(
@@ -236,85 +242,125 @@ fun StudyScreen(
                         translationY = dragY
                         rotationZ = (dragX / 30f).coerceIn(-7f, 7f)
                     }
-                    .pointerInput(index) {
+                    .pointerInput(index, busy) {
+                        if (busy) return@pointerInput
                         detectDragGestures(
                             onDragEnd = {
-                                when {
-                                    abs(dragX) >= abs(dragY) && dragX > 170f -> applyGrade(q, Grade.KNOWN)
-                                    abs(dragX) >= abs(dragY) && dragX < -170f -> applyGrade(q, Grade.UNKNOWN)
-                                    dragY > 170f -> applyGrade(q, Grade.UNSURE)
+                                val x = offsetX.value
+                                val y = offsetY.value
+                                val grade = when {
+                                    abs(x) >= abs(y) && x > 170f -> Grade.KNOWN
+                                    abs(x) >= abs(y) && x < -170f -> Grade.UNKNOWN
+                                    y > 170f -> Grade.UNSURE
+                                    else -> null
                                 }
-                                dragX = 0f
-                                dragY = 0f
+                                if (grade == null) {
+                                    scope.launch { offsetX.animateTo(0f, spring()) }
+                                    scope.launch { offsetY.animateTo(0f, spring()) }
+                                } else {
+                                    busy = true
+                                    exitGrade = grade
+                                    flash = overlayFor(grade).first
+                                    scope.launch {
+                                        val targetX = when (grade) {
+                                            Grade.KNOWN -> 1500f
+                                            Grade.UNKNOWN -> -1500f
+                                            Grade.UNSURE -> offsetX.value
+                                        }
+                                        val targetY = if (grade == Grade.UNSURE) 1700f else offsetY.value * 2f
+                                        launch { offsetX.animateTo(targetX, tween(200)) }
+                                        launch { offsetY.animateTo(targetY, tween(200)) }
+                                        delay(210)
+                                        applyGrade(q, grade)
+                                        offsetX.snapTo(0f)
+                                        offsetY.snapTo(0f)
+                                        exitGrade = null
+                                        busy = false
+                                        delay(120)
+                                        flash = null
+                                    }
+                                }
                             },
-                            onDragCancel = { dragX = 0f; dragY = 0f },
+                            onDragCancel = {
+                                scope.launch { offsetX.animateTo(0f, spring()) }
+                                scope.launch { offsetY.animateTo(0f, spring()) }
+                            },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                dragX += dragAmount.x
-                                dragY += dragAmount.y
-                                if (!revealed && maxOf(abs(dragX), abs(dragY)) > 70f) revealed = true
+                                scope.launch {
+                                    offsetX.snapTo(offsetX.value + dragAmount.x)
+                                    offsetY.snapTo(offsetY.value + dragAmount.y)
+                                }
+                                // A real swipe (not a tap) flips the card to the answer.
+                                if (!revealed && maxOf(abs(offsetX.value), abs(offsetY.value)) > 60f) {
+                                    revealed = true
+                                }
                             }
                         )
                     }
             ) {
-                Column(Modifier.fillMaxSize().padding(18.dp)) {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        StatusPill(store = store, questionId = q.id)
-                    }
-                    Spacer(Modifier.weight(2f))
-                    val questionText = if (yearMode) "『${q.a}』に関わる出来事が起きた年は？" else q.q
-                    val answerText = if (yearMode) formatYear(q.year) else q.a
-                    Text(
-                        questionText,
-                        fontSize = 21.sp,
-                        lineHeight = 30.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        color = questionColor,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    AnimatedContent(
-                        targetState = revealed,
-                        transitionSpec = {
-                            (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 3 })
-                                .togetherWith(fadeOut(tween(120)))
-                                .using(SizeTransform(clip = false))
-                        },
-                        label = "answerReveal"
-                    ) { shown ->
-                        if (shown) {
+                Box(Modifier.fillMaxSize()) {
+                    Column(Modifier.fillMaxSize().padding(18.dp)) {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            StatusPill(store = store, questionId = q.id)
+                        }
+                        Spacer(Modifier.weight(2f))
+                        val questionText = if (yearMode) "『${q.a}』に関わる出来事が起きた年は？" else q.q
+                        val answerText = if (yearMode) formatYear(q.year) else q.a
+                        Text(
+                            questionText,
+                            fontSize = 21.sp,
+                            lineHeight = 30.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            color = questionColor,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(28.dp))
+                        AnimatedVisibility(
+                            visible = revealed,
+                            enter = fadeIn(tween(150)),
+                            exit = fadeOut(tween(100))
+                        ) {
                             val dividerColor = InkOutline
-                            Column {
-                                Spacer(Modifier.height(26.dp))
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Canvas(Modifier.fillMaxWidth().height(1.dp)) {
-                                            drawLine(
-                                                color = dividerColor,
-                                                start = Offset(0f, 0f),
-                                                end = Offset(size.width, 0f),
-                                                strokeWidth = 2f,
-                                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
-                                            )
-                                        }
-                                        Spacer(Modifier.height(4.dp))
-                                        Text("こたえ", fontSize = 11.sp, color = InkTextSub)
-                                    }
-                                    Spacer(Modifier.size(10.dp))
-                                    Box(
-                                        Modifier
-                                            .clip(RoundedCornerShape(50))
-                                            .border(1.dp, InkOutline, RoundedCornerShape(50))
-                                            .clickable { showBookmark = true }
-                                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        Text("しおり", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = InkText)
-                                    }
+                            Canvas(Modifier.fillMaxWidth().height(1.dp)) {
+                                drawLine(
+                                    color = dividerColor,
+                                    start = Offset(0f, 0f),
+                                    end = Offset(size.width, 0f),
+                                    strokeWidth = 2f,
+                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
+                                )
+                            }
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().height(36.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                if (revealed) {
+                                    Text("こたえ", fontSize = 11.sp, color = InkTextSub)
                                 }
-                                Spacer(Modifier.height(14.dp))
+                            }
+                            SmallPillButton(
+                                text = "かくす",
+                                enabled = revealed,
+                                onClick = { revealed = false }
+                            )
+                            Spacer(Modifier.size(8.dp))
+                            SmallPillButton(
+                                text = "しおり",
+                                enabled = true,
+                                onClick = { showBookmark = true }
+                            )
+                        }
+                        AnimatedVisibility(
+                            visible = revealed,
+                            enter = fadeIn(tween(150)) + expandVertically(tween(150)),
+                            exit = fadeOut(tween(100)) + shrinkVertically(tween(100))
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Spacer(Modifier.height(10.dp))
                                 Text(
                                     answerText,
                                     fontSize = 25.sp,
@@ -343,18 +389,36 @@ fun StudyScreen(
                                     )
                                 }
                             }
-                        } else {
-                            Spacer(Modifier.height(0.dp))
+                        }
+                        Spacer(Modifier.weight(3f))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            val (lvText, lvColor) = levelLabel(q.level)
+                            Box(Modifier.size(8.dp).clip(CircleShape).background(lvColor))
+                            Spacer(Modifier.size(6.dp))
+                            Text(lvText, fontSize = 12.sp, color = InkTextSub)
+                            Spacer(Modifier.weight(1f))
+                            Text(q.chapter, fontSize = 11.sp, color = InkTextSub)
                         }
                     }
-                    Spacer(Modifier.weight(3f))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        val (lvText, lvColor) = levelLabel(q.level)
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(lvColor))
-                        Spacer(Modifier.size(6.dp))
-                        Text(lvText, fontSize = 12.sp, color = InkTextSub)
-                        Spacer(Modifier.weight(1f))
-                        Text(q.chapter, fontSize = 11.sp, color = InkTextSub)
+
+                    // Direction overlay ON the card (as in the original).
+                    if (overlay != null && (dragMag > 30f || exitGrade != null)) {
+                        Box(
+                            Modifier.fillMaxSize().background(overlay.first.copy(alpha = overlayAlpha)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    Modifier.size(84.dp).clip(CircleShape)
+                                        .border(3.dp, Color.White, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(overlay.second, fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                                Spacer(Modifier.height(10.dp))
+                                Text(overlay.third, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
                     }
                 }
             }
@@ -363,7 +427,7 @@ fun StudyScreen(
         Spacer(Modifier.height(10.dp))
         Text(
             if (revealed) "右へ＝合っていた ・ 左へ＝間違っていた ・ 下へ＝まあまあ"
-            else "スワイプすると答えが出ます。そのまま離すと判定",
+            else "スワイプすると答えが出ます。そのまま大きくスワイプすると判定",
             fontSize = 11.sp,
             color = InkTextSub,
             textAlign = TextAlign.Center,
@@ -373,6 +437,28 @@ fun StudyScreen(
 
     if (showBookmark && index < queue.size) {
         BookmarkDialog(store = store, question = queue[index], onDismiss = { showBookmark = false })
+    }
+}
+
+@Composable
+private fun SmallPillButton(text: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .border(
+                1.dp,
+                if (enabled) InkOutline else InkOutline.copy(alpha = 0.4f),
+                RoundedCornerShape(50)
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (enabled) InkText else InkTextSub.copy(alpha = 0.4f)
+        )
     }
 }
 
@@ -414,12 +500,13 @@ private fun StatusPill(store: AppStore, questionId: String) {
         }
         val blueDots = if (p != null && p.seen) minOf(p.streak, 5) else 0
         val redDot = p != null && p.seen && p.streak == 0 && p.lastGrade == Grade.UNKNOWN.name
+        val dotOff = InkOutline
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(5) { i ->
                 val c = when {
                     i >= 5 - blueDots && blueDots > 0 -> AccentBlue
                     i == 4 && redDot -> AccentRed
-                    else -> InkOutline
+                    else -> dotOff
                 }
                 Box(Modifier.size(8.dp).clip(CircleShape).background(c))
             }
