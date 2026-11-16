@@ -273,31 +273,28 @@ fun StudyScreen(
                                     exitGrade = grade
                                     flash = overlayFor(grade).first
                                     scope.launch {
-                                        // Fling the card off-screen: accelerating
-                                        // motion, stronger tilt, slight fall.
+                                        // Fling the card off sideways: every grade
+                                        // exits through the left or right edge,
+                                        // accelerating, tilting as it goes.
                                         val targetX = when (grade) {
                                             Grade.KNOWN -> 1600f
                                             Grade.UNKNOWN -> -1600f
-                                            Grade.UNSURE -> offsetX.value
-                                        }
-                                        val targetY = if (grade == Grade.UNSURE) {
-                                            1800f
-                                        } else {
-                                            offsetY.value * 2f + 380f
+                                            Grade.UNSURE ->
+                                                if (offsetX.value >= 0f) 1600f else -1600f
                                         }
                                         launch {
                                             offsetX.animateTo(
                                                 targetX,
-                                                tween(260, easing = FastOutLinearInEasing)
+                                                tween(280, easing = FastOutLinearInEasing)
                                             )
                                         }
                                         launch {
                                             offsetY.animateTo(
-                                                targetY,
-                                                tween(260, easing = FastOutLinearInEasing)
+                                                offsetY.value,
+                                                tween(280, easing = FastOutLinearInEasing)
                                             )
                                         }
-                                        delay(270)
+                                        delay(290)
                                         applyGrade(q, grade)
                                         offsetX.snapTo(0f)
                                         offsetY.snapTo(0f)
