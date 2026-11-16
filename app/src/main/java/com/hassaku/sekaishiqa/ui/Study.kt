@@ -2,6 +2,7 @@ package com.hassaku.sekaishiqa.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -241,7 +242,7 @@ fun StudyScreen(
                     .graphicsLayer {
                         translationX = dragX
                         translationY = dragY
-                        rotationZ = (dragX / 30f).coerceIn(-7f, 7f)
+                        rotationZ = (dragX / 22f).coerceIn(-14f, 14f)
                     }
                     .pointerInput(index, busy) {
                         if (busy) return@pointerInput
@@ -272,15 +273,31 @@ fun StudyScreen(
                                     exitGrade = grade
                                     flash = overlayFor(grade).first
                                     scope.launch {
+                                        // Fling the card off-screen: accelerating
+                                        // motion, stronger tilt, slight fall.
                                         val targetX = when (grade) {
-                                            Grade.KNOWN -> 1500f
-                                            Grade.UNKNOWN -> -1500f
+                                            Grade.KNOWN -> 1600f
+                                            Grade.UNKNOWN -> -1600f
                                             Grade.UNSURE -> offsetX.value
                                         }
-                                        val targetY = if (grade == Grade.UNSURE) 1700f else offsetY.value * 2f
-                                        launch { offsetX.animateTo(targetX, tween(200)) }
-                                        launch { offsetY.animateTo(targetY, tween(200)) }
-                                        delay(210)
+                                        val targetY = if (grade == Grade.UNSURE) {
+                                            1800f
+                                        } else {
+                                            offsetY.value * 2f + 380f
+                                        }
+                                        launch {
+                                            offsetX.animateTo(
+                                                targetX,
+                                                tween(260, easing = FastOutLinearInEasing)
+                                            )
+                                        }
+                                        launch {
+                                            offsetY.animateTo(
+                                                targetY,
+                                                tween(260, easing = FastOutLinearInEasing)
+                                            )
+                                        }
+                                        delay(270)
                                         applyGrade(q, grade)
                                         offsetX.snapTo(0f)
                                         offsetY.snapTo(0f)
