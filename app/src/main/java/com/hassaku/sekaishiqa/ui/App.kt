@@ -207,7 +207,7 @@ fun HomeScreen(
     var yokoChapter by remember { mutableStateOf<String?>(null) }
     var regionIdx by remember { mutableIntStateOf(0) }
     var tateChapter by remember { mutableStateOf<String?>(null) }
-    var mode by remember { mutableStateOf(StudyMode.ANKI) }
+    var mode by remember { mutableStateOf(StudyMode.ALL) }
     var levels by remember { mutableStateOf(setOf(1, 2, 3)) }
 
     val group = YokoGroups[groupIdx]
@@ -266,9 +266,6 @@ fun HomeScreen(
         if (axis == Axis.YOKO && selChapter == null && mode == StudyMode.ALL) filtered else filtered.shuffled()
     }
 
-    val weakQueue = remember(data) {
-        store.questions.filter { it.id !in data.excludedIds && store.isWeak(it, data) }.shuffled()
-    }
     val dueQueue = remember(data) {
         store.dueQuestions(data).filter { it.id !in data.excludedIds }.shuffled()
     }
@@ -368,41 +365,6 @@ fun HomeScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = InkTextSub
                     )
-                }
-            }
-
-            // Weak-question listening-style review card
-            Card(
-                onClick = {
-                    if (weakQueue.isNotEmpty()) {
-                        onStudy("苦手の聞き流し", "一問一答・ニガテのみ", weakQueue, false)
-                    }
-                },
-                colors = CardDefaults.cardColors(containerColor = InkSurface),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth().border(1.dp, InkOutline, RoundedCornerShape(16.dp))
-            ) {
-                Row(
-                    Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier.size(44.dp).clip(CircleShape).background(Color(0xFF23233A))
-                            .border(1.dp, InkOutline, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("▶", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("苦手の聞き流し", fontWeight = FontWeight.Bold, color = InkText)
-                        Text(
-                            if (weakQueue.isEmpty()) "ニガテな問題はまだありません" else "ニガテな問題 ${weakQueue.size}問を復習",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkTextSub
-                        )
-                    }
-                    Text("?", color = InkTextSub, style = MaterialTheme.typography.titleMedium)
                 }
             }
 
