@@ -80,17 +80,17 @@ private enum class StudyMode(val label: String, val short: String) {
 private data class ScopeGroup(val name: String, val color: Color, val chapters: List<String>)
 
 private val YokoGroups = listOf(
-    ScopeGroup("古代オリエント・地中海", Color(0xFFEE8A1D), listOf("古代オリエントと地中海世界", "ギリシア・ローマ")),
-    ScopeGroup("アジアの古代帝国", Color(0xFFD94F70), listOf("アジアの古代帝国")),
-    ScopeGroup("中国史", Color(0xFFE5484D), listOf("中国史", "中国近世・近代")),
-    ScopeGroup("インド・東南アジア", Color(0xFFC74BD9), listOf("インド史", "東南アジア史", "インド・東南アジア近世・近代")),
-    ScopeGroup("イスラーム・中央アジア", Color(0xFF12B76A), listOf("イスラーム世界の形成と拡大", "中央アジア史")),
-    ScopeGroup("中世ヨーロッパ", Color(0xFF7C5CFC), listOf("ヨーロッパ中世")),
-    ScopeGroup("近世ヨーロッパ", Color(0xFF2F6BFF), listOf("大航海時代と近世ヨーロッパ")),
-    ScopeGroup("市民革命と産業革命", Color(0xFF0E9BD8), listOf("市民革命と産業革命", "アメリカ史")),
-    ScopeGroup("帝国主義と世界大戦", Color(0xFF5E60CE), listOf("国民国家の形成と帝国主義", "二つの世界大戦", "アフリカ史", "ラテンアメリカ史")),
-    ScopeGroup("冷戦・現代世界", Color(0xFF7B61C9), listOf("冷戦と脱植民地化", "現代世界", "日本と世界")),
-    ScopeGroup("文化・テーマ史", Color(0xFF0FA3A3), listOf("文化史"))
+    ScopeGroup("古代オリエント・地中海", Color(0xFFEE8A1D), listOf("古代オリエント", "地中海諸民族", "ギリシア世界", "ヘレニズム世界", "ローマ共和国", "ローマ帝国")),
+    ScopeGroup("アジアの古代帝国", Color(0xFFD94F70), listOf("中国の古代帝国", "東アジア・内陸アジアの諸国")),
+    ScopeGroup("中国史", Color(0xFFE5484D), listOf("中国古代（先秦・秦漢）", "魏晋南北朝・隋唐", "宋・元・明", "明・清", "清末と近代化", "中華民国と中国共産党")),
+    ScopeGroup("インド・東南アジア", Color(0xFFC74BD9), listOf("インド古代", "インド中世（デリー・スルタン朝）", "東南アジア大陸部", "東南アジア海域部", "インド近世・近代", "東南アジア近世・近代")),
+    ScopeGroup("イスラーム・中央アジア", Color(0xFF12B76A), listOf("イスラームの成立とカリフ制", "イスラーム諸王朝とオスマン帝国", "中央アジア古代・中世", "中央アジア近現代")),
+    ScopeGroup("中世ヨーロッパ", Color(0xFF7C5CFC), listOf("中世前期のヨーロッパ", "ビザンツ帝国とスラヴ世界", "中世後期のヨーロッパ")),
+    ScopeGroup("近世ヨーロッパ", Color(0xFF2F6BFF), listOf("大航海時代", "近世ヨーロッパ")),
+    ScopeGroup("市民革命と産業革命", Color(0xFF0E9BD8), listOf("市民革命", "フランス革命とナポレオン", "産業革命と資本主義", "アメリカ合衆国の形成", "19世紀のアメリカ", "20世紀のアメリカ")),
+    ScopeGroup("帝国主義と世界大戦", Color(0xFF5E60CE), listOf("国民国家の形成", "帝国主義と植民地分割", "第一次世界大戦", "戦間期の世界", "第二次世界大戦", "アフリカ古代・中世", "近代アフリカ（植民地化と独立）", "先住民文明と植民地支配", "ラテンアメリカの独立と近代")),
+    ScopeGroup("冷戦・現代世界", Color(0xFF7B61C9), listOf("冷戦の展開", "脱植民地化と第三世界", "現代世界（20世紀後半）", "現代世界（21世紀）", "古代・中世の日本と東アジア", "近世・近代の日本と世界")),
+    ScopeGroup("文化・テーマ史", Color(0xFF0FA3A3), listOf("文化史（思想・宗教）", "文化史（文学・芸術）", "文化史（科学・学問）"))
 )
 
 private val RegionOrder = listOf(
