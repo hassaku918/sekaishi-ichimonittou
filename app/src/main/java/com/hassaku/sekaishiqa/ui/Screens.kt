@@ -284,7 +284,7 @@ private fun DayRing(day: Int, count: Int, isToday: Boolean) {
                 val arcSize = Size(size.width - stroke, size.height - stroke)
                 val topLeft = Offset(stroke / 2, stroke / 2)
                 drawArc(
-                    color = Color(0xFF2C2C35),
+                    color = Color(0xFFE4E4EF),
                     startAngle = -90f,
                     sweepAngle = 360f,
                     useCenter = false,
@@ -294,7 +294,7 @@ private fun DayRing(day: Int, count: Int, isToday: Boolean) {
                 )
                 if (count > 0) {
                     drawArc(
-                        color = Color.White,
+                        color = AccentBlue,
                         startAngle = -90f,
                         sweepAngle = 360f * minOf(count / 100f, 1f),
                         useCenter = false,
@@ -304,7 +304,7 @@ private fun DayRing(day: Int, count: Int, isToday: Boolean) {
                     )
                 }
             }
-            Text("$count", fontSize = 10.sp, color = Color.White)
+            Text("$count", fontSize = 10.sp, color = InkText)
         }
     }
 }

@@ -5,24 +5,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import com.hassaku.sekaishiqa.data.AppStore
-import com.hassaku.sekaishiqa.ui.AccentPurple
+import com.hassaku.sekaishiqa.ui.AccentBlue
 import com.hassaku.sekaishiqa.ui.AppRoot
-import com.hassaku.sekaishiqa.ui.InkBackground
 import com.hassaku.sekaishiqa.ui.InkOutline
-import com.hassaku.sekaishiqa.ui.InkSurface
 import com.hassaku.sekaishiqa.ui.InkSurfaceHigh
+import com.hassaku.sekaishiqa.ui.InkText
 import com.hassaku.sekaishiqa.ui.InkTextSub
+import com.hassaku.sekaishiqa.ui.PaperBackground
 
-private val AppColors = darkColorScheme(
-    primary = AccentPurple,
+private val AppColors = lightColorScheme(
+    primary = AccentBlue,
     onPrimary = Color.White,
-    background = InkBackground,
-    onBackground = Color(0xFFF2F2F5),
-    surface = InkSurface,
-    onSurface = Color(0xFFF2F2F5),
+    background = PaperBackground,
+    onBackground = InkText,
+    surface = Color.White,
+    onSurface = InkText,
     surfaceVariant = InkSurfaceHigh,
     onSurfaceVariant = InkTextSub,
     outline = InkOutline
@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
         val store = AppStore(this)
         setContent {
             MaterialTheme(colorScheme = AppColors) {
-                Surface(color = InkBackground) {
+                Surface(color = PaperBackground) {
                     AppRoot(store)
                 }
             }

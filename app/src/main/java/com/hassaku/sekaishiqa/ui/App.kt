@@ -1,8 +1,10 @@
 package com.hassaku.sekaishiqa.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,9 +16,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -28,505 +33,663 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.hassaku.sekaishiqa.data.AppStore
 import com.hassaku.sekaishiqa.data.Question
 
-// Palette matched to the original app's black home theme.
-val InkBackground = Color(0xFF0C0C11)
-val InkSurface = Color(0xFF1B1B23)
-val InkSurfaceHigh = Color(0xFF26262F)
-val InkOutline = Color(0xFF3A3A44)
-val InkTextSub = Color(0xFF9E9EA7)
-val AccentPurple = Color(0xFF6C63FF)
-val AccentBlue = Color(0xFF8F8BFF)
+// Light palette matching the original app's standard (free/Prime) theme.
+val PaperBackground = Color(0xFFF5F5FA)
+val PaperDot = Color(0xFFE0E1EF)
+val InkText = Color(0xFF1C1C30)
+val InkTextSub = Color(0xFF8A8CA3)
+val InkSurface = Color.White
+val InkSurfaceHigh = Color(0xFFEFF0F6)
+val InkOutline = Color(0xFFE3E3EF)
+val AccentBlue = Color(0xFF2E4BFF)
+val AccentPurple = Color(0xFF7C5CFC)
 val AccentRed = Color(0xFFE5484D)
 val AccentGreen = Color(0xFF12B76A)
+val GoldPill = Color(0xFFF2B93B)
+
+private enum class Axis { YOKO, TATE, NENGO }
+private enum class StudyMode(val label: String, val short: String) {
+    ALL("すべて", "すべて"), ANKI("暗記モード", "暗記"), WEAK("ニガテのみ", "ニガテ"), FRESH("未学習", "未学習")
+}
+
+private data class ScopeGroup(val name: String, val color: Color, val chapters: List<String>)
+
+private val YokoGroups = listOf(
+    ScopeGroup("古代オリエント・地中海", Color(0xFFEE8A1D), listOf("古代オリエントと地中海世界", "ギリシア・ローマ")),
+    ScopeGroup("アジアの古代帝国", Color(0xFFD94F70), listOf("アジアの古代帝国")),
+    ScopeGroup("中国史", Color(0xFFE5484D), listOf("中国史", "中国近世・近代")),
+    ScopeGroup("インド・東南アジア", Color(0xFFC74BD9), listOf("インド史", "東南アジア史", "インド・東南アジア近世・近代")),
+    ScopeGroup("イスラーム・中央アジア", Color(0xFF12B76A), listOf("イスラーム世界の形成と拡大", "中央アジア史")),
+    ScopeGroup("中世ヨーロッパ", Color(0xFF7C5CFC), listOf("ヨーロッパ中世")),
+    ScopeGroup("近世ヨーロッパ", Color(0xFF2F6BFF), listOf("大航海時代と近世ヨーロッパ")),
+    ScopeGroup("市民革命と産業革命", Color(0xFF0E9BD8), listOf("市民革命と産業革命", "アメリカ史")),
+    ScopeGroup("帝国主義と世界大戦", Color(0xFF5E60CE), listOf("国民国家の形成と帝国主義", "二つの世界大戦", "アフリカ史", "ラテンアメリカ史")),
+    ScopeGroup("冷戦・現代世界", Color(0xFF7B61C9), listOf("冷戦と脱植民地化", "現代世界", "日本と世界")),
+    ScopeGroup("文化・テーマ史", Color(0xFF0FA3A3), listOf("文化史"))
+)
+
+private val RegionOrder = listOf(
+    "西ヨーロッパ", "東ヨーロッパ・ロシア", "中東・イスラーム圏", "中央アジア",
+    "中国", "インド", "東南アジア", "日本", "アフリカ", "アメリカ", "ラテンアメリカ"
+)
+
+private val RegionColors = mapOf(
+    "西ヨーロッパ" to Color(0xFF2F6BFF),
+    "東ヨーロッパ・ロシア" to Color(0xFF5E60CE),
+    "中東・イスラーム圏" to Color(0xFF12B76A),
+    "中央アジア" to Color(0xFF0FA3A3),
+    "中国" to Color(0xFFE5484D),
+    "インド" to Color(0xFFC74BD9),
+    "東南アジア" to Color(0xFFEE8A1D),
+    "日本" to Color(0xFFD94F70),
+    "アフリカ" to Color(0xFFB7791F),
+    "アメリカ" to Color(0xFF0E9BD8),
+    "ラテンアメリカ" to Color(0xFF7C5CFC)
+)
 
 sealed interface Route {
     data object Home : Route
     data object Wordbooks : Route
+    data class BookDetail(val bookId: String) : Route
     data object Calendar : Route
     data object Settings : Route
     data class Study(
         val title: String,
+        val subtitle: String = "",
         val queue: List<Question>,
-        val yearMode: Boolean = false,
-        val subtitle: String = ""
+        val yearMode: Boolean = false
     ) : Route
-    data class BookDetail(val bookId: String) : Route
 }
-
-private val StudyLightColors = androidx.compose.material3.lightColorScheme(
-    primary = Color(0xFF2F6BFF),
-    background = Color(0xFFFFFFFF),
-    surface = Color(0xFFFFFFFF),
-    onBackground = Color(0xFF111318),
-    onSurface = Color(0xFF111318),
-    onSurfaceVariant = Color(0xFF6B7280),
-    surfaceVariant = Color(0xFFF0F0F3),
-    outline = Color(0xFFE0E0E6)
-)
 
 @Composable
 fun AppRoot(store: AppStore) {
     var route by remember { mutableStateOf<Route>(Route.Home) }
 
-    Scaffold { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+    Scaffold(containerColor = PaperBackground) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
             when (val r = route) {
-                is Route.Home -> HomeScreen(
+                Route.Home -> HomeScreen(
                     store = store,
-                    onStudy = { title, queue, yearMode, subtitle ->
-                        route = Route.Study(title, queue, yearMode, subtitle)
-                    },
-                    onOpenWordbooks = { route = Route.Wordbooks },
                     onOpenCalendar = { route = Route.Calendar },
-                    onOpenSettings = { route = Route.Settings }
+                    onOpenSettings = { route = Route.Settings },
+                    onOpenWordbooks = { route = Route.Wordbooks },
+                    onStudy = { title, subtitle, queue, yearMode ->
+                        route = Route.Study(title, subtitle, queue, yearMode)
+                    }
                 )
-                is Route.Wordbooks -> WordbooksScreen(
+                Route.Wordbooks -> WordbooksScreen(
                     store = store,
                     onBack = { route = Route.Home },
                     onOpenBook = { route = Route.BookDetail(it) },
-                    onStudy = { title, queue, _ -> route = Route.Study(title, queue, false, "一問一答・my単語帳") }
-                )
-                is Route.Calendar -> CalendarScreen(store, onBack = { route = Route.Home })
-                is Route.Settings -> SettingsScreen(store, onBack = { route = Route.Home })
-                is Route.Study -> androidx.compose.material3.MaterialTheme(colorScheme = StudyLightColors) {
-                    androidx.compose.material3.Surface(color = Color.White) {
-                        StudyScreen(
-                            store = store,
-                            title = r.title,
-                            subtitle = r.subtitle,
-                            queue = r.queue,
-                            yearMode = r.yearMode,
-                            onDone = { route = Route.Home }
-                        )
+                    onStudy = { title, queue ->
+                        route = Route.Study(title, "一問一答・my単語帳", queue, false)
                     }
-                }
+                )
                 is Route.BookDetail -> BookDetailScreen(
                     store = store,
                     bookId = r.bookId,
                     onBack = { route = Route.Wordbooks },
-                    onStudy = { title, queue, _ -> route = Route.Study(title, queue, false, "一問一答・my単語帳") }
+                    onStudy = { title, queue ->
+                        route = Route.Study(title, "一問一答・my単語帳", queue, false)
+                    }
+                )
+                Route.Calendar -> CalendarScreen(store = store, onBack = { route = Route.Home })
+                Route.Settings -> SettingsScreen(store = store, onBack = { route = Route.Home })
+                is Route.Study -> StudyScreen(
+                    store = store,
+                    title = r.title,
+                    subtitle = r.subtitle,
+                    queue = r.queue,
+                    yearMode = r.yearMode,
+                    onDone = { route = Route.Home }
                 )
             }
         }
     }
 }
-
-private enum class Axis { YOKO, TATE, NENGO }
-private enum class StudyMode { ALL, ANKI, WEAK, FRESH }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     store: AppStore,
-    onStudy: (String, List<Question>, Boolean, String) -> Unit,
-    onOpenWordbooks: () -> Unit,
     onOpenCalendar: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenWordbooks: () -> Unit,
+    onStudy: (String, String, List<Question>, Boolean) -> Unit
 ) {
     val data by store.data.collectAsState()
-    val streak = remember(data) { store.streakDays(data) }
-    val graduated = remember(data) { data.progress.values.count { it.graduated } }
-    val seenTotal = remember(data) { data.progress.values.count { it.seen } }
-    val due = remember(data) { store.dueQuestions(data) }
-    val streakCounts = remember(data) {
-        (1..5).map { n -> data.progress.values.count { p -> if (n == 5) p.streak >= 5 else p.streak == n } }
-    }
-    val todayAnswered = data.logs[store.today()]?.answered ?: 0
     val total = store.questions.size
+    val todayAnswered = data.logs[store.today()]?.answered ?: 0
+    val streak = store.streakDays(data)
+    val graduatedAll = data.progress.values.count { it.graduated }
+    val seenAll = data.progress.values.count { it.seen }
 
     var axis by remember { mutableStateOf(Axis.YOKO) }
-    var selChapter by remember { mutableStateOf<String?>(null) }
-    var selRegion by remember { mutableStateOf<String?>(null) }
-    var mode by remember { mutableStateOf(StudyMode.ALL) }
+    var groupIdx by remember { mutableIntStateOf(0) }
+    var yokoChapter by remember { mutableStateOf<String?>(null) }
+    var regionIdx by remember { mutableIntStateOf(0) }
+    var tateChapter by remember { mutableStateOf<String?>(null) }
+    var mode by remember { mutableStateOf(StudyMode.ANKI) }
     var levels by remember { mutableStateOf(setOf(1, 2, 3)) }
 
-    fun buildQueue(): List<Question> {
-        val scope = when (axis) {
-            Axis.YOKO -> selChapter?.let { store.byChapter[it].orEmpty() }
-                ?: store.chapters.flatMap { store.byChapter[it].orEmpty() }
-            Axis.TATE -> selRegion?.let { store.byRegion[it].orEmpty() }
-                ?: store.regions.flatMap { store.byRegion[it].orEmpty() }
-            Axis.NENGO -> store.yearQuestions
-        }
-        var qs = scope.filter { it.level in levels }
-        qs = when (mode) {
-            StudyMode.ALL -> qs
-            StudyMode.ANKI -> qs.filter { store.isDue(it, data) }
-            StudyMode.WEAK -> qs.filter { store.isWeak(it, data) }
-            StudyMode.FRESH -> qs.filter { !(data.progress[it.id]?.seen ?: false) }
-        }
-        return if (axis == Axis.YOKO && mode == StudyMode.ALL) qs else qs.shuffled()
+    val group = YokoGroups[groupIdx]
+    val regions = RegionOrder.filter { it in store.regions }
+    val region = regions.getOrElse(regionIdx) { regions.firstOrNull() ?: "" }
+    val regionColor = RegionColors[region] ?: AccentBlue
+    val accent = if (axis == Axis.TATE) regionColor else group.color
+
+    val chaptersInRegion = remember(region) {
+        store.chapters.filter { ch -> store.byRegion[region]?.any { it.chapter == ch } == true }
     }
-
-    val queue = remember(data, axis, selChapter, selRegion, mode, levels) { buildQueue() }
-
-    fun startStudy() {
-        if (queue.isEmpty()) return
-        val axisLabel = when (axis) { Axis.YOKO -> "ヨコ"; Axis.TATE -> "タテ"; Axis.NENGO -> "年号" }
-        val modeLabel = when (mode) {
-            StudyMode.ALL -> "すべて"; StudyMode.ANKI -> "暗記"
-            StudyMode.WEAK -> "ニガテのみ"; StudyMode.FRESH -> "未学習"
-        }
-        val title = when (axis) {
-            Axis.YOKO -> selChapter ?: "全体"
-            Axis.TATE -> selRegion ?: "全体"
-            Axis.NENGO -> "年号"
-        }
-        onStudy(title, queue, axis == Axis.NENGO, "一問一答・$axisLabel・$modeLabel")
+    val scopeAll: List<Question> = when (axis) {
+        Axis.YOKO -> group.chapters.flatMap { store.byChapter[it].orEmpty() }
+        Axis.TATE -> store.byRegion[region].orEmpty()
+        Axis.NENGO -> group.chapters.flatMap { store.byChapter[it].orEmpty() }.filter { it.year != null }
     }
+    val subChapters: List<String> = when (axis) {
+        Axis.YOKO -> group.chapters
+        Axis.TATE -> chaptersInRegion
+        Axis.NENGO -> emptyList()
+    }
+    val selChapter = when (axis) {
+        Axis.YOKO -> yokoChapter
+        Axis.TATE -> tateChapter
+        Axis.NENGO -> null
+    }
+    val scoped = if (selChapter != null) scopeAll.filter { it.chapter == selChapter } else scopeAll
+    val leveled = scoped.filter { it.level in levels }
 
-    LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item { Spacer(Modifier.height(2.dp)) }
-        item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        "世界史 一問一答",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Pill("全機能フリー", AccentPurple)
-                        Text("一問一答 ${total}問", style = MaterialTheme.typography.labelMedium, color = InkTextSub)
-                    }
-                }
-                HeaderButton(top = "${streak}日", label = "連続記録", onClick = onOpenCalendar)
-                Spacer(Modifier.width(8.dp))
-                HeaderButton(top = "暦", label = "カレンダー", onClick = onOpenCalendar)
-                Spacer(Modifier.width(8.dp))
-                HeaderButton(top = "設", label = "設定", onClick = onOpenSettings)
+    fun progressOf(list: List<Question>): Triple<Int, Int, IntArray> {
+        var seen = 0
+        var grad = 0
+        val streaks = IntArray(5)
+        for (q in list) {
+            val p = data.progress[q.id] ?: continue
+            if (!p.seen) continue
+            seen++
+            if (p.graduated) grad++
+            if (p.streak in 1..4) streaks[p.streak - 1]++
+            else if (p.streak >= 5) streaks[4]++
+        }
+        return Triple(seen, grad, streaks)
+    }
+    val (seen, grad, streakCounts) = progressOf(leveled)
+    val masteredPct = if (leveled.isEmpty()) 0 else grad * 100 / leveled.size
+
+    val queue = remember(data, axis, groupIdx, regionIdx, selChapter, mode, levels) {
+        val filtered = leveled.filter { q ->
+            when (mode) {
+                StudyMode.ALL -> true
+                StudyMode.ANKI -> store.isDue(q, data)
+                StudyMode.WEAK -> store.isWeak(q, data)
+                StudyMode.FRESH -> !(data.progress[q.id]?.seen ?: false)
             }
         }
-        item {
+        if (axis == Axis.YOKO && selChapter == null && mode == StudyMode.ALL) filtered else filtered.shuffled()
+    }
+
+    val weakQueue = remember(data) { store.questions.filter { store.isWeak(it, data) }.shuffled() }
+    val dueQueue = remember(data) { store.dueQuestions(data).shuffled() }
+
+    val scopeTitle = when (axis) {
+        Axis.YOKO -> "ヨコ・${group.name}・${selChapter ?: "すべて"}"
+        Axis.TATE -> "タテ・$region・${selChapter ?: "すべて"}"
+        Axis.NENGO -> "年号・${group.name}"
+    } + if (levels.size < 3) levels.sorted().joinToString("") { "・Lv$it" } else ""
+    val studyTitle = when (axis) {
+        Axis.YOKO -> selChapter ?: group.name
+        Axis.TATE -> selChapter ?: region
+        Axis.NENGO -> group.name
+    }
+    val axisLabel = when (axis) { Axis.YOKO -> "ヨコ"; Axis.TATE -> "タテ"; Axis.NENGO -> "年号" }
+
+    Box(Modifier.fillMaxSize()) {
+        Canvas(Modifier.fillMaxSize()) {
+            val step = 26.dp.toPx()
+            val r = 1.6.dp.toPx()
+            var x = step / 2
+            while (x < size.width) {
+                var y = step / 2
+                while (y < size.height) {
+                    drawCircle(PaperDot, r, Offset(x, y))
+                    y += step
+                }
+                x += step
+            }
+        }
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Text("世界史 一問一答", fontSize = 25.sp, fontWeight = FontWeight.Bold, color = InkText)
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.clip(RoundedCornerShape(4.dp)).background(GoldPill)
+                                .padding(horizontal = 7.dp, vertical = 2.dp)
+                        ) {
+                            Text("FREE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5C4300))
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text("一問一答 ${total}問", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AccentBlue)
+                    }
+                }
+                HeaderButton(glyph = "${streak}日", label = "連続記録", onClick = onOpenCalendar)
+                Spacer(Modifier.width(8.dp))
+                HeaderButton(glyph = "暦", label = "カレンダー", onClick = onOpenCalendar)
+                Spacer(Modifier.width(8.dp))
+                HeaderButton(glyph = "設", label = "設定", onClick = onOpenSettings)
+            }
+
+            // Streak card
             Card(
                 onClick = onOpenCalendar,
-                colors = CardDefaults.cardColors(containerColor = InkSurface),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
                 shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().border(1.dp, InkOutline, RoundedCornerShape(16.dp))
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Pill("連続記録", AccentPurple)
+                        Box(
+                            Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFE3ECFF))
+                                .padding(horizontal = 7.dp, vertical = 2.dp)
+                        ) {
+                            Text("記録", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AccentBlue)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text("連続記録 ${streak}日", fontWeight = FontWeight.Bold, color = InkText)
                         Spacer(Modifier.weight(1f))
-                        Text("${streak}日", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                        Text(" ›", color = InkTextSub, style = MaterialTheme.typography.headlineMedium)
+                        Text("›", color = InkTextSub, style = MaterialTheme.typography.headlineMedium)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("今日のログインプレイ", style = MaterialTheme.typography.labelMedium, color = InkTextSub)
                         Spacer(Modifier.weight(1f))
                         Text(
-                            if (todayAnswered >= AppStore.DAILY_GOAL) "完了"
-                            else "あと ${AppStore.DAILY_GOAL - todayAnswered}問",
+                            "${todayAnswered}/${AppStore.DAILY_GOAL}問",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (todayAnswered >= AppStore.DAILY_GOAL) AccentGreen else Color.White
+                            color = if (todayAnswered >= AppStore.DAILY_GOAL) AccentGreen else InkText
                         )
                     }
                     LinearProgressIndicator(
                         progress = { (todayAnswered.toFloat() / AppStore.DAILY_GOAL).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Color.White,
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
+                        color = AccentBlue,
                         trackColor = InkSurfaceHigh
                     )
                     Text(
-                        "卒業 ${graduated}問 ・ 学習済み ${seenTotal}問 / 全 ${total}問",
+                        "卒業 ${graduatedAll}問 ・ 学習済み ${seenAll}問 / 全${total}問",
                         style = MaterialTheme.typography.labelSmall,
                         color = InkTextSub
                     )
                 }
             }
-        }
-        item {
+
+            // Weak-question listening-style review card
             Card(
                 onClick = {
-                    if (due.isNotEmpty()) {
-                        onStudy("全体", due.shuffled(), false, "一問一答・全体・暗記")
+                    if (weakQueue.isNotEmpty()) {
+                        onStudy("苦手の聞き流し", "一問一答・ニガテのみ", weakQueue, false)
                     }
                 },
-                colors = CardDefaults.cardColors(containerColor = InkSurface),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
                 shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().border(1.dp, InkOutline, RoundedCornerShape(16.dp))
+            ) {
+                Row(
+                    Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier.size(44.dp).clip(CircleShape).background(InkText),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("▶", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("苦手の聞き流し", fontWeight = FontWeight.Bold, color = InkText)
+                        Text(
+                            if (weakQueue.isEmpty()) "ニガテな問題はまだありません" else "ニガテな問題 ${weakQueue.size}問を復習",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkTextSub
+                        )
+                    }
+                    Text("?", color = InkTextSub, style = MaterialTheme.typography.titleMedium)
+                }
+            }
+
+            // Progress card for the current selection
+            Card(
+                onClick = {
+                    if (dueQueue.isNotEmpty()) {
+                        onStudy("期限切れの復習", "一問一答・暗記", dueQueue, false)
+                    }
+                },
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().border(1.dp, InkOutline, RoundedCornerShape(16.dp))
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("全体の進捗", fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.weight(1f))
                         Text(
-                            "習得 ${graduated}/${total} ・ ${if (total == 0) 0 else graduated * 100 / total}%",
-                            style = MaterialTheme.typography.labelMedium,
+                            scopeTitle,
                             fontWeight = FontWeight.Bold,
-                            color = AccentBlue
+                            color = InkText,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            "習得 $grad/${leveled.size}・$masteredPct%",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accent
                         )
                     }
+                    Text("着手 $seen/${leveled.size}", style = MaterialTheme.typography.labelSmall, color = InkTextSub)
                     LinearProgressIndicator(
-                        progress = { if (total == 0) 0f else graduated.toFloat() / total },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = AccentPurple,
+                        progress = { if (leveled.isEmpty()) 0f else grad.toFloat() / leveled.size },
+                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
+                        color = accent,
                         trackColor = InkSurfaceHigh
                     )
-                    Text("着手 ${seenTotal}/${total}", style = MaterialTheme.typography.labelSmall, color = InkTextSub)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text("正解", style = MaterialTheme.typography.labelMedium, color = InkTextSub)
-                        streakCounts.forEachIndexed { i, c ->
-                            StreakPill(n = i + 1, count = c, highlighted = i == 0)
+                        Text("正解", style = MaterialTheme.typography.labelSmall, color = InkTextSub)
+                        (1..5).forEach { n ->
+                            val has = streakCounts[n - 1] > 0
+                            Box(
+                                Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (has) accent else Color.White)
+                                    .border(1.dp, if (has) accent else InkOutline, RoundedCornerShape(50))
+                                    .padding(horizontal = 10.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    "${n}連",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (has) Color.White else InkTextSub
+                                )
+                            }
+                        }
+                        Spacer(Modifier.weight(1f))
+                        if (dueQueue.isNotEmpty()) {
+                            Text(
+                                "期限切れ ${dueQueue.size}問 ›",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = AccentRed
+                            )
                         }
                     }
-                    Text(
-                        if (due.isNotEmpty()) "タップで暗記の復習（期限 ${due.size}問）"
-                        else "復習期限の問題はありません",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = InkTextSub
-                    )
                 }
             }
-        }
-        item {
+
             SectionLabel("出題軸")
-            Spacer(Modifier.height(6.dp))
             SegmentedControl(
                 options = listOf("ヨコ", "タテ", "年号", "my単語帳"),
                 selectedIndex = axis.ordinal,
-                onSelect = { i ->
-                    when (i) {
-                        0 -> axis = Axis.YOKO
-                        1 -> axis = Axis.TATE
-                        2 -> axis = Axis.NENGO
-                        3 -> onOpenWordbooks()
-                    }
+                onSelect = {
+                    if (it == 3) onOpenWordbooks() else axis = Axis.entries[it]
                 }
             )
-        }
-        item {
+
             SectionLabel("範囲")
-            Spacer(Modifier.height(6.dp))
-            when (axis) {
-                Axis.YOKO -> FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            if (axis == Axis.TATE) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    ScopeChip("すべて", total, selChapter == null, AccentRed) { selChapter = null }
-                    store.chapters.forEach { ch ->
-                        ScopeChip(ch, store.byChapter[ch].orEmpty().size, selChapter == ch, AccentRed) { selChapter = ch }
+                    regions.forEachIndexed { i, r ->
+                        GroupPill(
+                            name = r,
+                            count = store.byRegion[r]?.size ?: 0,
+                            color = RegionColors[r] ?: AccentBlue,
+                            selected = i == regionIdx,
+                            onClick = { regionIdx = i; tateChapter = null }
+                        )
                     }
                 }
-                Axis.TATE -> FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    ScopeChip("すべて", total, selRegion == null, AccentPurple) { selRegion = null }
-                    store.regions.forEach { rg ->
-                        ScopeChip(rg, store.byRegion[rg].orEmpty().size, selRegion == rg, AccentPurple) { selRegion = rg }
+                    YokoGroups.forEachIndexed { i, g ->
+                        val count = if (axis == Axis.NENGO) {
+                            g.chapters.flatMap { store.byChapter[it].orEmpty() }.count { it.year != null }
+                        } else {
+                            g.chapters.sumOf { store.byChapter[it]?.size ?: 0 }
+                        }
+                        GroupPill(
+                            name = g.name,
+                            count = count,
+                            color = g.color,
+                            selected = i == groupIdx,
+                            onClick = { groupIdx = i; yokoChapter = null }
+                        )
                     }
-                }
-                Axis.NENGO -> Card(
-                    colors = CardDefaults.cardColors(containerColor = InkSurface),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        "年号 ${store.yearQuestions.size}問。出来事と年代をセットで覚えます。",
-                        modifier = Modifier.padding(14.dp),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
                 }
             }
-        }
-        item {
+            if (subChapters.isNotEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().border(1.dp, InkOutline, RoundedCornerShape(16.dp))
+                ) {
+                    FlowRow(
+                        Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ScopeChip(
+                            label = "すべて",
+                            count = scopeAll.size,
+                            color = accent,
+                            selected = selChapter == null,
+                            onClick = {
+                                if (axis == Axis.YOKO) yokoChapter = null else tateChapter = null
+                            }
+                        )
+                        subChapters.forEach { ch ->
+                            val count = scopeAll.count { it.chapter == ch }
+                            if (count > 0) {
+                                ScopeChip(
+                                    label = ch,
+                                    count = count,
+                                    color = accent,
+                                    selected = selChapter == ch,
+                                    onClick = {
+                                        if (axis == Axis.YOKO) yokoChapter = ch else tateChapter = ch
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             SectionLabel("モード")
-            Spacer(Modifier.height(6.dp))
             SegmentedControl(
-                options = listOf("すべて", "暗記", "ニガテのみ", "未学習"),
+                options = StudyMode.entries.map { it.label },
                 selectedIndex = mode.ordinal,
                 onSelect = { mode = StudyMode.entries[it] }
             )
-        }
-        item {
+
             SectionLabel("レベル")
-            Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (1..3).forEach { lv ->
-                    LevelPill(lv, lv in levels) {
-                        levels = if (lv in levels) {
-                            if (levels.size == 1) levels else levels - lv
-                        } else levels + lv
+                    val selected = lv in levels
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) accent else Color.White)
+                            .border(1.dp, if (selected) accent else InkOutline, RoundedCornerShape(10.dp))
+                            .clickable {
+                                levels = if (selected) {
+                                    if (levels.size > 1) levels - lv else levels
+                                } else levels + lv
+                            }
+                            .padding(horizontal = 18.dp, vertical = 9.dp)
+                    ) {
+                        Text(
+                            "Lv$lv",
+                            fontWeight = FontWeight.Bold,
+                            color = if (selected) Color.White else InkTextSub
+                        )
                     }
                 }
             }
-        }
-        item {
+
             Button(
-                onClick = { startStudy() },
+                onClick = {
+                    if (queue.isNotEmpty()) {
+                        onStudy(studyTitle, "一問一答・$axisLabel・${mode.short}", queue, axis == Axis.NENGO)
+                    }
+                },
                 enabled = queue.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth().height(54.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentPurple,
-                    disabledContainerColor = InkSurfaceHigh
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
             ) {
                 Text(
-                    if (queue.isNotEmpty()) "学習をはじめる（${queue.size}問）" else "対象の問題がありません",
-                    style = MaterialTheme.typography.titleMedium,
+                    if (axis == Axis.NENGO) "年号問題をはじめる" else "この範囲ではじめる",
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
-            Spacer(Modifier.height(4.dp))
             Text(
-                "ヨコ＝単元の順 ・ タテ＝国・地域ごと ・ 年号＝出来事と年代",
+                if (queue.isEmpty()) "対象の問題がありません（モード・レベルの条件を変えてください）"
+                else "対象 ${queue.size}問が出題されます",
                 style = MaterialTheme.typography.labelSmall,
                 color = InkTextSub
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-private fun Pill(text: String, color: Color) {
-    Box(
-        Modifier.clip(RoundedCornerShape(50)).background(color).padding(horizontal = 10.dp, vertical = 3.dp)
-    ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
-    }
-}
-
-@Composable
-private fun HeaderButton(top: String, label: String, onClick: () -> Unit) {
-    Column(
-        Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(InkSurface)
-            .border(1.dp, InkOutline, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(top, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = InkTextSub)
-    }
-}
-
-@Composable
-private fun StreakPill(n: Int, count: Int, highlighted: Boolean) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (highlighted) AccentPurple else InkSurfaceHigh)
-            .padding(horizontal = 9.dp, vertical = 3.dp)
-    ) {
-        Text(
-            "${n}連 ${count}",
-            style = MaterialTheme.typography.labelSmall,
-            color = if (highlighted) Color.White else InkTextSub
-        )
+private fun HeaderButton(glyph: String, label: String, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(Color.White)
+                .border(1.dp, InkOutline, RoundedCornerShape(14.dp))
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(glyph, fontWeight = FontWeight.Bold, color = InkText, fontSize = 14.sp)
+        }
+        Spacer(Modifier.height(3.dp))
+        Text(label, fontSize = 10.sp, color = InkTextSub)
     }
 }
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.Bold,
-        color = Color(0xFFD6D6DE)
-    )
+    Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = InkText)
+}
+
+@Composable
+private fun GroupPill(name: String, count: Int, color: Color, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) color else Color.White)
+            .border(1.dp, if (selected) color else InkOutline, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.size(8.dp).clip(CircleShape)
+                .background(if (selected) Color.White else color)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            name,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (selected) Color.White else InkText
+        )
+        Spacer(Modifier.width(5.dp))
+        Text(
+            "$count",
+            fontSize = 11.sp,
+            color = if (selected) Color.White.copy(alpha = 0.85f) else InkTextSub
+        )
+    }
+}
+
+@Composable
+private fun ScopeChip(label: String, count: Int, color: Color, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) color else Color.White)
+            .border(1.dp, if (selected) color else InkOutline, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) Color.White else InkText
+        )
+        Spacer(Modifier.width(5.dp))
+        Text(
+            "$count",
+            fontSize = 11.sp,
+            color = if (selected) Color.White.copy(alpha = 0.85f) else InkTextSub
+        )
+    }
 }
 
 @Composable
 fun SegmentedControl(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
     Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(InkSurfaceHigh)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White)
+            .border(1.dp, InkOutline, RoundedCornerShape(12.dp)).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         options.forEachIndexed { i, label ->
             val selected = i == selectedIndex
             Box(
-                Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(if (selected) Color.White else Color.Transparent)
+                Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
+                    .background(if (selected) AccentBlue else Color.Transparent)
                     .clickable { onSelect(i) }
-                    .padding(vertical = 10.dp),
+                    .padding(vertical = 9.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     label,
-                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 13.sp,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                    color = if (selected) Color.Black else InkTextSub
+                    color = if (selected) Color.White else InkText
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun ScopeChip(name: String, count: Int, selected: Boolean, accent: Color, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) accent else InkSurface)
-            .border(1.dp, if (selected) accent else InkOutline, RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            name,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            color = Color.White
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            "$count",
-            style = MaterialTheme.typography.labelMedium,
-            color = if (selected) Color(0xE6FFFFFF) else InkTextSub
-        )
-    }
-}
-
-@Composable
-private fun LevelPill(level: Int, on: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (on) AccentRed else InkSurface)
-            .border(1.dp, if (on) AccentRed else InkOutline, RoundedCornerShape(50))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            "Lv$level",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
-            color = if (on) Color.White else InkTextSub
-        )
     }
 }

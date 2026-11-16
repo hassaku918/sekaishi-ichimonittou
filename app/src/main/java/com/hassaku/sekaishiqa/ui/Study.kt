@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,14 +47,25 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.hassaku.sekaishiqa.data.AppStore
 import com.hassaku.sekaishiqa.data.Grade
+import com.hassaku.sekaishiqa.data.Progress
 import com.hassaku.sekaishiqa.data.Question
+import kotlin.math.abs
 
-private val StudyBlue = Color(0xFF2F6BFF)
-private val StudyGreen = Color(0xFF12A150)
-private val StudyGray = Color(0xFF5B6472)
-private val StudyPillGreen = Color(0xFF0FA968)
+private val OverlayGreen = Color(0xFF79C57E)
+private val OverlayGray = Color(0xFF9AA0A8)
+private val OverlayBlue = Color(0xFF7FA8DC)
+private val CardBorder = Color(0xFF26262E)
+
+private data class UndoEntry(val questionId: String, val prev: Progress?, val grade: Grade)
+
+private fun levelLabel(level: Int): Pair<String, Color> = when (level) {
+    1 -> "Lv1 共通テスト向け基礎" to Color(0xFF12B76A)
+    2 -> "Lv2 私大向け応用" to Color(0xFF2F6BFF)
+    else -> "Lv3 早慶向け難題" to Color(0xFFF79009)
+}
 
 @Composable
 fun StudyScreen(
@@ -72,32 +84,54 @@ fun StudyScreen(
     var showBookmark by remember { mutableStateOf(false) }
     var dragX by remember { mutableStateOf(0f) }
     var dragY by remember { mutableStateOf(0f) }
+    val undoStack = remember { mutableStateListOf<UndoEntry>() }
+
+    fun applyGrade(q: Question, g: Grade) {
+        val prev = store.data.value.progress[q.id]
+        store.grade(q.id, g)
+        undoStack.add(UndoEntry(q.id, prev, g))
+        when (g) {
+            Grade.KNOWN -> known++
+            Grade.UNSURE -> unsure++
+            Grade.UNKNOWN -> unknown++
+        }
+        revealed = false
+        dragX = 0f
+        dragY = 0f
+        index++
+    }
+
+    fun undo() {
+        val e = undoStack.removeLastOrNull() ?: return
+        store.undoGrade(e.questionId, e.prev, e.grade)
+        when (e.grade) {
+            Grade.KNOWN -> known--
+            Grade.UNSURE -> unsure--
+            Grade.UNKNOWN -> unknown--
+        }
+        index--
+        revealed = true
+        dragX = 0f
+        dragY = 0f
+    }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = InkText)
                 if (subtitle.isNotBlank()) {
-                    Text(
-                        subtitle,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(subtitle, fontSize = 12.sp, color = InkTextSub)
                 }
             }
-            Box(
-                Modifier.size(40.dp).clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(onClick = onDone),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("×", style = MaterialTheme.typography.titleMedium)
-            }
+            CircleButton(glyph = "↩", enabled = undoStack.isNotEmpty(), onClick = { undo() })
+            Spacer(Modifier.size(8.dp))
+            CircleButton(glyph = "×", enabled = true, onClick = onDone)
             Spacer(Modifier.size(10.dp))
             Text(
                 if (queue.isEmpty()) "" else "${minOf(index + 1, queue.size)}/${queue.size}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = InkText
             )
         }
         Spacer(Modifier.height(10.dp))
@@ -105,134 +139,173 @@ fun StudyScreen(
             LinearProgressIndicator(
                 progress = { (index.toFloat() / queue.size).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)),
-                color = StudyBlue,
+                color = AccentBlue,
                 trackColor = Color(0xFFE3E6F0)
             )
         }
         Spacer(Modifier.height(12.dp))
 
         if (queue.isEmpty()) {
-            Text("対象の問題がありません。")
+            Text("対象の問題がありません。", color = InkText)
             Spacer(Modifier.height(12.dp))
-            Button(onClick = onDone) { Text("ホームへ戻る") }
+            Button(
+                onClick = onDone,
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+            ) { Text("ホームへ戻る") }
             return
         }
         if (index >= queue.size) {
-            Text("セッション完了", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Text("自信アリ ${known} / まあまあ ${unsure} / 自信なし ${unknown}")
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = onDone) { Text("ホームへ戻る") }
+            Column(
+                Modifier.fillMaxWidth().padding(top = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("セッション完了", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = InkText)
+                Text(
+                    "合っていた $known / まあまあ $unsure / 間違っていた $unknown",
+                    color = InkTextSub
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = onDone,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                ) { Text("ホームへ戻る", fontWeight = FontWeight.Bold) }
+                if (undoStack.isNotEmpty()) {
+                    TextButton(onClick = { undo() }) { Text("最後の判定をもどす") }
+                }
+            }
             return
         }
 
         val q = queue[index]
 
-        fun applyGrade(g: Grade) {
-            store.grade(q.id, g)
-            when (g) {
-                Grade.KNOWN -> known++
-                Grade.UNSURE -> unsure++
-                Grade.UNKNOWN -> unknown++
-            }
-            revealed = false
-            dragX = 0f
-            dragY = 0f
-            index++
+        // Direction overlay (like the original: the whole area tints while swiping)
+        val dragMag = maxOf(abs(dragX), abs(dragY))
+        val overlay = when {
+            dragX > 40f && abs(dragX) >= abs(dragY) -> Triple(OverlayGreen, "✓", "合っていた")
+            dragX < -40f && abs(dragX) >= abs(dragY) -> Triple(OverlayGray, "✕", "間違っていた")
+            dragY > 40f -> Triple(OverlayBlue, "〜", "まあまあ")
+            else -> null
         }
 
-        Card(
-            onClick = { revealed = true },
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .border(1.dp, Color(0xFFE0E0E6), RoundedCornerShape(16.dp))
-                .graphicsLayer { translationX = dragX; translationY = dragY }
-                .pointerInput(q.id, revealed) {
-                    detectDragGestures(
-                        onDragEnd = {
-                            if (revealed) {
-                                when {
-                                    dragX > 160f -> applyGrade(Grade.KNOWN)
-                                    dragX < -160f -> applyGrade(Grade.UNKNOWN)
-                                    dragY > 160f -> applyGrade(Grade.UNSURE)
-                                }
-                            }
-                            dragX = 0f
-                            dragY = 0f
-                        },
-                        onDragCancel = { dragX = 0f; dragY = 0f },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            dragX += dragAmount.x
-                            dragY += dragAmount.y
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            if (overlay != null) {
+                Box(
+                    Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp))
+                        .background(overlay.first.copy(alpha = (dragMag / 260f).coerceIn(0f, 0.92f))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            Modifier.size(84.dp).clip(CircleShape)
+                                .border(3.dp, Color.White, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(overlay.second, fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
-                    )
-                }
-        ) {
-            Column(Modifier.fillMaxSize().padding(20.dp)) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    StreakHistory(store = store, questionId = q.id)
-                }
-                Spacer(Modifier.weight(1f))
-                if (yearMode) {
-                    Text(
-                        "『${q.a}』に関わる出来事が起きた年は？",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        color = if (revealed) Color(0xFF9AA0AA) else Color(0xFF111318),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (revealed) {
-                        Spacer(Modifier.height(20.dp))
-                        DashedDividerWithLabel()
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            formatYear(q.year),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        if (q.note.isNotBlank()) {
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                q.note,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text(overlay.third, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
-                } else {
+                }
+            }
+
+            Card(
+                onClick = { revealed = true },
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(1.5.dp, CardBorder, RoundedCornerShape(10.dp))
+                    .graphicsLayer {
+                        translationX = dragX
+                        translationY = dragY
+                        rotationZ = (dragX / 30f).coerceIn(-7f, 7f)
+                    }
+                    .pointerInput(index) {
+                        detectDragGestures(
+                            onDragStart = { revealed = true },
+                            onDragEnd = {
+                                when {
+                                    abs(dragX) >= abs(dragY) && dragX > 170f -> applyGrade(q, Grade.KNOWN)
+                                    abs(dragX) >= abs(dragY) && dragX < -170f -> applyGrade(q, Grade.UNKNOWN)
+                                    dragY > 170f -> applyGrade(q, Grade.UNSURE)
+                                }
+                                dragX = 0f
+                                dragY = 0f
+                            },
+                            onDragCancel = { dragX = 0f; dragY = 0f },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                dragX += dragAmount.x
+                                dragY += dragAmount.y
+                            }
+                        )
+                    }
+            ) {
+                Column(Modifier.fillMaxSize().padding(18.dp)) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        StatusPill(store = store, questionId = q.id)
+                    }
+                    Spacer(Modifier.weight(2f))
+                    val questionText = if (yearMode) "『${q.a}』に関わる出来事が起きた年は？" else q.q
+                    val answerText = if (yearMode) formatYear(q.year) else q.a
                     Text(
-                        q.q,
-                        style = MaterialTheme.typography.headlineSmall,
+                        questionText,
+                        fontSize = 21.sp,
+                        lineHeight = 30.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        color = if (revealed) Color(0xFF9AA0AA) else Color(0xFF111318),
+                        color = if (revealed) Color(0xFFA6A8B5) else InkText,
                         modifier = Modifier.fillMaxWidth()
                     )
                     if (revealed) {
-                        Spacer(Modifier.height(20.dp))
-                        DashedDividerWithLabel()
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(26.dp))
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Canvas(Modifier.fillMaxWidth().height(1.dp)) {
+                                    drawLine(
+                                        color = Color(0xFFD5D7DD),
+                                        start = Offset(0f, 0f),
+                                        end = Offset(size.width, 0f),
+                                        strokeWidth = 2f,
+                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
+                                    )
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text("こたえ", fontSize = 11.sp, color = InkTextSub)
+                            }
+                            Spacer(Modifier.size(10.dp))
+                            Box(
+                                Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .border(1.dp, Color(0xFFD5D7DD), RoundedCornerShape(50))
+                                    .clickable { showBookmark = true }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("しおり", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = InkText)
+                            }
+                        }
+                        Spacer(Modifier.height(14.dp))
                         Text(
-                            q.a,
-                            style = MaterialTheme.typography.headlineMedium,
+                            answerText,
+                            fontSize = 25.sp,
+                            lineHeight = 34.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
+                            color = InkText,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        if (q.year != null) {
+                        if (!yearMode && q.year != null) {
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 formatYear(q.year),
                                 textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = InkTextSub,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -241,77 +314,32 @@ fun StudyScreen(
                             Text(
                                 q.note,
                                 textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = InkTextSub,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
-                }
-                Spacer(Modifier.weight(1f))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "${q.chapter} ・ ${q.region} ・ Lv${q.level}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.weight(1f))
-                    if (!revealed) {
-                        Text(
-                            "タップで答えを表示",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Spacer(Modifier.weight(3f))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        val (lvText, lvColor) = levelLabel(q.level)
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(lvColor))
+                        Spacer(Modifier.size(6.dp))
+                        Text(lvText, fontSize = 12.sp, color = InkTextSub)
                         Spacer(Modifier.weight(1f))
-                    }
-                    Box(
-                        Modifier
-                            .clip(RoundedCornerShape(50))
-                            .border(1.dp, Color(0xFFD5D7DD), RoundedCornerShape(50))
-                            .clickable { showBookmark = true }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text("しおり", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Text(q.chapter, fontSize = 11.sp, color = Color(0xFFB9BBC7))
                     }
                 }
             }
         }
 
-        Spacer(Modifier.height(14.dp))
-        if (revealed) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { applyGrade(Grade.UNKNOWN) },
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = StudyGray)
-                ) { Text("自信なし", fontWeight = FontWeight.Bold) }
-                Button(
-                    onClick = { applyGrade(Grade.UNSURE) },
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = StudyBlue)
-                ) { Text("まあまあ", fontWeight = FontWeight.Bold) }
-                Button(
-                    onClick = { applyGrade(Grade.KNOWN) },
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = StudyGreen)
-                ) { Text("自信アリ", fontWeight = FontWeight.Bold) }
-            }
-        } else {
-            Button(
-                onClick = { revealed = true },
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF11131A))
-            ) { Text("答えを見る", fontWeight = FontWeight.Bold) }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "答えを見たあと、右＝自信アリ / 左＝自信なし / 下＝まあまあ にスワイプでも判定できます",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "タップで答え表示 / 右へ＝合っていた ・ 左へ＝間違っていた ・ 下へ＝まあまあ",
+            fontSize = 11.sp,
+            color = InkTextSub,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 
     if (showBookmark && index < queue.size) {
@@ -320,72 +348,58 @@ fun StudyScreen(
 }
 
 @Composable
-private fun DashedDividerWithLabel() {
-    Column(Modifier.fillMaxWidth()) {
-        Canvas(Modifier.fillMaxWidth().height(1.dp)) {
-            drawLine(
-                color = Color(0xFFD5D7DD),
-                start = Offset(0f, 0f),
-                end = Offset(size.width, 0f),
-                strokeWidth = 2f,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
-            )
-        }
-        Spacer(Modifier.height(4.dp))
+private fun CircleButton(glyph: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(42.dp).clip(CircleShape).background(InkSurfaceHigh)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
         Text(
-            "こたえ",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            glyph,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (enabled) InkText else InkTextSub.copy(alpha = 0.4f)
         )
     }
 }
 
 @Composable
-private fun StreakHistory(store: AppStore, questionId: String) {
+private fun StatusPill(store: AppStore, questionId: String) {
     val data by store.data.collectAsState()
-    val p = data.progress[questionId] ?: return
-    if (!p.seen) return
+    val p = data.progress[questionId]
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (p.streak >= 1) {
-            Box(
-                Modifier.clip(RoundedCornerShape(50)).background(StudyPillGreen)
-                    .padding(horizontal = 10.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    "${p.streak}連続正解",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
+        val (label, color) = when {
+            p == null || !p.seen -> "新規" to Color(0xFF7C86A0)
+            p.streak >= 1 -> "${p.streak}連続正解" to AccentBlue
+            p.lastGrade == Grade.UNKNOWN.name -> "前回不正解" to Color(0xFFF79009)
+            else -> "復習" to Color(0xFF7C86A0)
         }
-        val blue = minOf(p.correctCount, 5)
-        val red = minOf(p.wrongCount, 5 - blue)
+        Box(
+            Modifier.clip(RoundedCornerShape(50)).background(color)
+                .padding(horizontal = 10.dp, vertical = 3.dp)
+        ) {
+            Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+        val blueDots = if (p != null && p.seen) minOf(p.streak, 5) else 0
+        val redDot = p != null && p.seen && p.streak == 0 && p.lastGrade == Grade.UNKNOWN.name
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(5) { i ->
                 val c = when {
-                    i < blue -> StudyBlue
-                    i < blue + red -> Color(0xFFE5484D)
+                    i >= 5 - blueDots && blueDots > 0 -> AccentBlue
+                    i == 4 && redDot -> AccentRed
                     else -> Color(0xFFD8DAE0)
                 }
-                Box(Modifier.size(9.dp).clip(CircleShape).background(c))
+                Box(Modifier.size(8.dp).clip(CircleShape).background(c))
             }
         }
-        Text(
-            "${p.correctCount + p.wrongCount}回",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (p.graduated) {
-            Text(
-                "卒業",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = StudyPillGreen
-            )
+        if (p != null && p.seen) {
+            val attempts = p.correctCount + p.wrongCount
+            if (attempts > 0) {
+                Text("${attempts}回", fontSize = 11.sp, color = InkTextSub)
+            }
         }
     }
 }

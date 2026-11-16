@@ -129,6 +129,21 @@ class AppStore(context: Context) {
         }
     }
 
+    fun undoGrade(questionId: String, prev: Progress?, grade: Grade) {
+        val today = today()
+        update { data ->
+            val log = data.logs[today] ?: DayLog()
+            data.copy(
+                progress = if (prev == null) data.progress - questionId
+                else data.progress + (questionId to prev),
+                logs = data.logs + (today to log.copy(
+                    answered = maxOf(0, log.answered - 1),
+                    correct = maxOf(0, log.correct - if (grade == Grade.KNOWN) 1 else 0)
+                ))
+            )
+        }
+    }
+
     fun recordEssay(essayId: String, score: Grade) {
         val today = today()
         update { data ->
