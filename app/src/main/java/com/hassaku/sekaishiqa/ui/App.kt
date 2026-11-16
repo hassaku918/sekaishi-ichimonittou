@@ -282,6 +282,7 @@ fun HomeScreen(
     val axisLabel = when (axis) { Axis.YOKO -> "ヨコ"; Axis.TATE -> "タテ"; Axis.NENGO -> "年号" }
 
     Box(Modifier.fillMaxSize()) {
+        val dotColor = PaperDot
         Canvas(Modifier.fillMaxSize()) {
             val step = 26.dp.toPx()
             val r = 1.6.dp.toPx()
@@ -289,7 +290,7 @@ fun HomeScreen(
             while (x < size.width) {
                 var y = step / 2
                 while (y < size.height) {
-                    drawCircle(PaperDot, r, Offset(x, y))
+                    drawCircle(dotColor, r, Offset(x, y))
                     y += step
                 }
                 x += step

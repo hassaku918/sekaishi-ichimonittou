@@ -2,7 +2,7 @@ package com.hassaku.sekaishiqa.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -50,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -187,11 +188,12 @@ fun StudyScreen(
         }
 
         val q = queue[index]
-        val questionColor by animateColorAsState(
-            targetValue = if (revealed) InkTextSub else InkText,
+        val questionFade by animateFloatAsState(
+            targetValue = if (revealed) 1f else 0f,
             animationSpec = tween(220),
-            label = "questionColor"
+            label = "questionFade"
         )
+        val questionColor = lerp(InkText, InkTextSub, questionFade)
 
         // Direction overlay (like the original: the whole area tints while swiping)
         val dragMag = maxOf(abs(dragX), abs(dragY))
@@ -281,6 +283,7 @@ fun StudyScreen(
                         label = "answerReveal"
                     ) { shown ->
                         if (shown) {
+                            val dividerColor = InkOutline
                             Column {
                                 Spacer(Modifier.height(26.dp))
                                 Row(
@@ -290,7 +293,7 @@ fun StudyScreen(
                                     Column(Modifier.weight(1f)) {
                                         Canvas(Modifier.fillMaxWidth().height(1.dp)) {
                                             drawLine(
-                                                color = InkOutline,
+                                                color = dividerColor,
                                                 start = Offset(0f, 0f),
                                                 end = Offset(size.width, 0f),
                                                 strokeWidth = 2f,

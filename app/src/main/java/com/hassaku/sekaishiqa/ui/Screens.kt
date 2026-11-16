@@ -278,13 +278,15 @@ private fun DayRing(day: Int, count: Int, isToday: Boolean) {
             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
             color = if (isToday) AccentBlue else InkTextSub
         )
+        val trackColor = InkSurfaceHigh
+        val arcColor = AccentBlue
         Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(44.dp)) {
                 val stroke = 4.dp.toPx()
                 val arcSize = Size(size.width - stroke, size.height - stroke)
                 val topLeft = Offset(stroke / 2, stroke / 2)
                 drawArc(
-                    color = InkSurfaceHigh,
+                    color = trackColor,
                     startAngle = -90f,
                     sweepAngle = 360f,
                     useCenter = false,
@@ -294,7 +296,7 @@ private fun DayRing(day: Int, count: Int, isToday: Boolean) {
                 )
                 if (count > 0) {
                     drawArc(
-                        color = AccentBlue,
+                        color = arcColor,
                         startAngle = -90f,
                         sweepAngle = 360f * minOf(count / 100f, 1f),
                         useCenter = false,
