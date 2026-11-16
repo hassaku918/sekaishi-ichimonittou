@@ -214,6 +214,7 @@ fun StudyScreen(
         val dragMag = maxOf(abs(dragX), abs(dragY))
         val activeGrade: Grade? = when {
             exitGrade != null -> exitGrade
+            !revealed -> null
             abs(dragX) >= abs(dragY) && dragX > 40f -> Grade.KNOWN
             abs(dragX) >= abs(dragY) && dragX < -40f -> Grade.UNKNOWN
             dragY > 40f -> Grade.UNSURE
@@ -248,16 +249,25 @@ fun StudyScreen(
                             onDragEnd = {
                                 val x = offsetX.value
                                 val y = offsetY.value
-                                val grade = when {
-                                    abs(x) >= abs(y) && x > 170f -> Grade.KNOWN
-                                    abs(x) >= abs(y) && x < -170f -> Grade.UNKNOWN
-                                    y > 170f -> Grade.UNSURE
-                                    else -> null
-                                }
-                                if (grade == null) {
+                                if (!revealed) {
+                                    // First swipe: releasing it only reveals the
+                                    // answer. Grading is impossible from here,
+                                    // however far the swipe went.
+                                    if (maxOf(abs(x), abs(y)) > 30f) revealed = true
                                     scope.launch { offsetX.animateTo(0f, spring()) }
                                     scope.launch { offsetY.animateTo(0f, spring()) }
-                                } else {
+                                } else if (!busy) {
+                                    // Second swipe: this one grades.
+                                    val grade = when {
+                                        abs(x) >= abs(y) && x > 170f -> Grade.KNOWN
+                                        abs(x) >= abs(y) && x < -170f -> Grade.UNKNOWN
+                                        y > 170f -> Grade.UNSURE
+                                        else -> null
+                                    }
+                                    if (grade == null) {
+                                        scope.launch { offsetX.animateTo(0f, spring()) }
+                                        scope.launch { offsetY.animateTo(0f, spring()) }
+                                    } else {
                                     busy = true
                                     exitGrade = grade
                                     flash = overlayFor(grade).first
@@ -279,6 +289,7 @@ fun StudyScreen(
                                         delay(120)
                                         flash = null
                                     }
+                                    }
                                 }
                             },
                             onDragCancel = {
@@ -290,10 +301,6 @@ fun StudyScreen(
                                 scope.launch {
                                     offsetX.snapTo(offsetX.value + dragAmount.x)
                                     offsetY.snapTo(offsetY.value + dragAmount.y)
-                                }
-                                // A real swipe (not a tap) flips the card to the answer.
-                                if (!revealed && maxOf(abs(offsetX.value), abs(offsetY.value)) > 60f) {
-                                    revealed = true
                                 }
                             }
                         )
@@ -427,7 +434,7 @@ fun StudyScreen(
         Spacer(Modifier.height(10.dp))
         Text(
             if (revealed) "右へ＝合っていた ・ 左へ＝間違っていた ・ 下へ＝まあまあ"
-            else "スワイプすると答えが出ます。そのまま大きくスワイプすると判定",
+            else "スワイプして離すと答えが出ます。もう一度スワイプすると判定",
             fontSize = 11.sp,
             color = InkTextSub,
             textAlign = TextAlign.Center,
