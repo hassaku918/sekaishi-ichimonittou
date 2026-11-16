@@ -1,5 +1,6 @@
 package com.hassaku.sekaishiqa.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -119,6 +120,16 @@ sealed interface Route {
 @Composable
 fun AppRoot(store: AppStore) {
     var route by remember { mutableStateOf<Route>(Route.Home) }
+    var studyReturn by remember { mutableStateOf<Route>(Route.Home) }
+
+    // System back button steps back one screen instead of leaving the app.
+    BackHandler(enabled = route !is Route.Home) {
+        route = when (val r = route) {
+            is Route.BookDetail -> Route.Wordbooks
+            is Route.Study -> studyReturn
+            else -> Route.Home
+        }
+    }
 
     Scaffold(containerColor = PaperBackground) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -129,6 +140,7 @@ fun AppRoot(store: AppStore) {
                     onOpenSettings = { route = Route.Settings },
                     onOpenWordbooks = { route = Route.Wordbooks },
                     onStudy = { title, subtitle, queue, yearMode ->
+                        studyReturn = Route.Home
                         route = Route.Study(title, subtitle, queue, yearMode)
                     }
                 )
@@ -137,6 +149,7 @@ fun AppRoot(store: AppStore) {
                     onBack = { route = Route.Home },
                     onOpenBook = { route = Route.BookDetail(it) },
                     onStudy = { title, queue, yearMode ->
+                        studyReturn = Route.Wordbooks
                         route = Route.Study(title, "一問一答・my単語帳", queue, yearMode)
                     }
                 )
@@ -145,6 +158,7 @@ fun AppRoot(store: AppStore) {
                     bookId = r.bookId,
                     onBack = { route = Route.Wordbooks },
                     onStudy = { title, queue, yearMode ->
+                        studyReturn = Route.BookDetail(r.bookId)
                         route = Route.Study(title, "一問一答・my単語帳", queue, yearMode)
                     }
                 )
@@ -156,7 +170,7 @@ fun AppRoot(store: AppStore) {
                     subtitle = r.subtitle,
                     queue = r.queue,
                     yearMode = r.yearMode,
-                    onDone = { route = Route.Home }
+                    onDone = { route = studyReturn }
                 )
             }
         }
