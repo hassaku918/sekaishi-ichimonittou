@@ -243,12 +243,14 @@ fun StudyScreen(
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier
                     .fillMaxSize()
-                    .border(1.5.dp, InkText.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
                     .graphicsLayer {
                         translationX = dragX
                         translationY = dragY
                         rotationZ = (dragX / 22f).coerceIn(-14f, 14f)
                     }
+                    // Border must come after graphicsLayer, otherwise it is
+                    // drawn outside the moving layer and stays behind.
+                    .border(1.5.dp, InkText.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
                     .pointerInput(index, busy) {
                         if (busy) return@pointerInput
                         detectDragGestures(
