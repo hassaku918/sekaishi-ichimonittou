@@ -239,6 +239,15 @@ class AppStore(context: Context) {
         update { it.copy(darkMode = value) }
     }
 
+    fun setExcluded(questionId: String, excluded: Boolean) {
+        update {
+            it.copy(
+                excludedIds = if (excluded) it.excludedIds + questionId
+                else it.excludedIds - questionId
+            )
+        }
+    }
+
     fun resetAll() {
         update { StoreData() }
     }

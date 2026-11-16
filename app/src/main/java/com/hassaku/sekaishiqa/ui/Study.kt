@@ -41,6 +41,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -203,6 +204,10 @@ fun StudyScreen(
         }
 
         val q = queue[index]
+        // Keyed by index: when the question advances, the old card subtree is
+        // dropped instantly, so the answer's exit animation cannot flash the
+        // next question's answer on the fresh card.
+        key(index) {
         val questionFade by animateFloatAsState(
             targetValue = if (revealed) 1f else 0f,
             animationSpec = tween(150),
@@ -330,8 +335,8 @@ fun StudyScreen(
                         val answerText = if (yearMode) formatYear(q.year) else q.a
                         Text(
                             questionText,
-                            fontSize = 21.sp,
-                            lineHeight = 30.sp,
+                            fontSize = 19.sp,
+                            lineHeight = 27.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
                             color = questionColor,
@@ -374,6 +379,22 @@ fun StudyScreen(
                                 enabled = true,
                                 onClick = { showBookmark = true }
                             )
+                            Spacer(Modifier.size(8.dp))
+                            SmallPillButton(
+                                text = "出さない",
+                                enabled = !busy,
+                                onClick = {
+                                    // Exclude this card from all future queues
+                                    // and move on without grading it.
+                                    store.setExcluded(q.id, true)
+                                    revealed = false
+                                    scope.launch {
+                                        offsetX.snapTo(0f)
+                                        offsetY.snapTo(0f)
+                                    }
+                                    index++
+                                }
+                            )
                         }
                         AnimatedVisibility(
                             visible = revealed,
@@ -384,8 +405,8 @@ fun StudyScreen(
                                 Spacer(Modifier.height(10.dp))
                                 Text(
                                     answerText,
-                                    fontSize = 25.sp,
-                                    lineHeight = 34.sp,
+                                    fontSize = 22.sp,
+                                    lineHeight = 30.sp,
                                     fontWeight = FontWeight.Bold,
                                     textAlign = TextAlign.Center,
                                     color = InkText,
@@ -443,6 +464,7 @@ fun StudyScreen(
                     }
                 }
             }
+        }
         }
 
         Spacer(Modifier.height(10.dp))

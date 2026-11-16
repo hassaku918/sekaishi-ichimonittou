@@ -332,6 +332,24 @@ fun SettingsScreen(store: AppStore, onBack: () -> Unit) {
             selectedIndex = if (data.darkMode) 1 else 0,
             onSelect = { store.setDarkMode(it == 1) }
         )
+        Text("出さないカード（${data.excludedIds.size}件）", style = MaterialTheme.typography.titleMedium)
+        if (data.excludedIds.isEmpty()) {
+            Text("ありません。学習画面で「出さない」を押したカードは、今後出題されなくなります。")
+        } else {
+            Text("学習画面で「出さない」を押したカードは出題されません。「戻す」で再び出題されます。")
+            data.excludedIds.sorted().forEach { id ->
+                val question = store.questionsById[id]
+                if (question != null) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(question.q, fontSize = 13.sp, maxLines = 2)
+                            Text(question.a, fontSize = 12.sp, color = InkTextSub)
+                        }
+                        TextButton(onClick = { store.setExcluded(id, false) }) { Text("戻す") }
+                    }
+                }
+            }
+        }
         Text("会員・課金・広告はありません。全ての機能を無料で使えます。学習データは端末内にのみ保存されます。")
         Button(onClick = {
             val intent = Intent(Intent.ACTION_SEND).apply {

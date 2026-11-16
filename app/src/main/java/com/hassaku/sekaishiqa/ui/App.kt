@@ -177,7 +177,7 @@ fun AppRoot(store: AppStore) {
                     store = store,
                     title = r.title,
                     subtitle = r.subtitle,
-                    queue = r.queue,
+                    queue = r.queue.filter { it.id !in store.data.value.excludedIds },
                     yearMode = r.yearMode,
                     onDone = { route = studyReturn }
                 )
@@ -256,7 +256,7 @@ fun HomeScreen(
 
     val queue = remember(data, axis, groupIdx, regionIdx, selChapter, mode, levels) {
         val filtered = leveled.filter { q ->
-            when (mode) {
+            q.id !in data.excludedIds && when (mode) {
                 StudyMode.ALL -> true
                 StudyMode.ANKI -> store.isDue(q, data)
                 StudyMode.WEAK -> store.isWeak(q, data)
@@ -266,8 +266,12 @@ fun HomeScreen(
         if (axis == Axis.YOKO && selChapter == null && mode == StudyMode.ALL) filtered else filtered.shuffled()
     }
 
-    val weakQueue = remember(data) { store.questions.filter { store.isWeak(it, data) }.shuffled() }
-    val dueQueue = remember(data) { store.dueQuestions(data).shuffled() }
+    val weakQueue = remember(data) {
+        store.questions.filter { it.id !in data.excludedIds && store.isWeak(it, data) }.shuffled()
+    }
+    val dueQueue = remember(data) {
+        store.dueQuestions(data).filter { it.id !in data.excludedIds }.shuffled()
+    }
 
     val scopeTitle = when (axis) {
         Axis.YOKO -> "ヨコ・${group.name}・${selChapter ?: "すべて"}"
