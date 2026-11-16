@@ -284,7 +284,7 @@ private fun DayRing(day: Int, count: Int, isToday: Boolean) {
                 val arcSize = Size(size.width - stroke, size.height - stroke)
                 val topLeft = Offset(stroke / 2, stroke / 2)
                 drawArc(
-                    color = Color(0xFFE4E4EF),
+                    color = InkSurfaceHigh,
                     startAngle = -90f,
                     sweepAngle = 360f,
                     useCenter = false,
@@ -313,6 +313,7 @@ private fun DayRing(day: Int, count: Int, isToday: Boolean) {
 
 @Composable
 fun SettingsScreen(store: AppStore, onBack: () -> Unit) {
+    val data by store.data.collectAsState()
     val context = LocalContext.current
     var importText by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
@@ -323,6 +324,12 @@ fun SettingsScreen(store: AppStore, onBack: () -> Unit) {
     ) {
         TextButton(onClick = onBack) { Text("‹ 戻る") }
         Text("設定", style = MaterialTheme.typography.headlineSmall)
+        Text("テーマ", style = MaterialTheme.typography.titleMedium)
+        SegmentedControl(
+            options = listOf("ライト", "ダーク"),
+            selectedIndex = if (data.darkMode) 1 else 0,
+            onSelect = { store.setDarkMode(it == 1) }
+        )
         Text("会員・課金・広告はありません。全ての機能を無料で使えます。学習データは端末内にのみ保存されます。")
         Button(onClick = {
             val intent = Intent(Intent.ACTION_SEND).apply {

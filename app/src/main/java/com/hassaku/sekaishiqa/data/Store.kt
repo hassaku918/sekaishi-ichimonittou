@@ -235,6 +235,10 @@ class AppStore(context: Context) {
         }.getOrDefault(false)
     }
 
+    fun setDarkMode(value: Boolean) {
+        update { it.copy(darkMode = value) }
+    }
+
     fun resetAll() {
         update { StoreData() }
     }

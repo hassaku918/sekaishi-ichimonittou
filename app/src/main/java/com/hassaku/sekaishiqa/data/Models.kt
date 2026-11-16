@@ -56,5 +56,6 @@ data class StoreData(
     val progress: Map<String, Progress> = emptyMap(),
     val wordbooks: List<Wordbook> = emptyList(),
     val logs: Map<Long, DayLog> = emptyMap(),
-    val essayScores: Map<String, String> = emptyMap()
+    val essayScores: Map<String, String> = emptyMap(),
+    val darkMode: Boolean = false
 )

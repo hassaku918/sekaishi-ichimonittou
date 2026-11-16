@@ -1,5 +1,13 @@
 package com.hassaku.sekaishiqa.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,7 +65,6 @@ import kotlin.math.abs
 private val OverlayGreen = Color(0xFF79C57E)
 private val OverlayGray = Color(0xFF9AA0A8)
 private val OverlayBlue = Color(0xFF7FA8DC)
-private val CardBorder = Color(0xFF26262E)
 
 private data class UndoEntry(val questionId: String, val prev: Progress?, val grade: Grade)
 
@@ -140,7 +147,7 @@ fun StudyScreen(
                 progress = { (index.toFloat() / queue.size).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)),
                 color = AccentBlue,
-                trackColor = Color(0xFFE3E6F0)
+                trackColor = InkSurfaceHigh
             )
         }
         Spacer(Modifier.height(12.dp))
@@ -180,6 +187,11 @@ fun StudyScreen(
         }
 
         val q = queue[index]
+        val questionColor by animateColorAsState(
+            targetValue = if (revealed) InkTextSub else InkText,
+            animationSpec = tween(220),
+            label = "questionColor"
+        )
 
         // Direction overlay (like the original: the whole area tints while swiping)
         val dragMag = maxOf(abs(dragX), abs(dragY))
@@ -212,12 +224,11 @@ fun StudyScreen(
             }
 
             Card(
-                onClick = { revealed = true },
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = InkSurface),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier
                     .fillMaxSize()
-                    .border(1.5.dp, CardBorder, RoundedCornerShape(10.dp))
+                    .border(1.5.dp, InkText.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
                     .graphicsLayer {
                         translationX = dragX
                         translationY = dragY
@@ -225,7 +236,6 @@ fun StudyScreen(
                     }
                     .pointerInput(index) {
                         detectDragGestures(
-                            onDragStart = { revealed = true },
                             onDragEnd = {
                                 when {
                                     abs(dragX) >= abs(dragY) && dragX > 170f -> applyGrade(q, Grade.KNOWN)
@@ -240,6 +250,7 @@ fun StudyScreen(
                                 change.consume()
                                 dragX += dragAmount.x
                                 dragY += dragAmount.y
+                                if (!revealed && maxOf(abs(dragX), abs(dragY)) > 70f) revealed = true
                             }
                         )
                     }
@@ -257,66 +268,80 @@ fun StudyScreen(
                         lineHeight = 30.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        color = if (revealed) Color(0xFFA6A8B5) else InkText,
+                        color = questionColor,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    if (revealed) {
-                        Spacer(Modifier.height(26.dp))
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Canvas(Modifier.fillMaxWidth().height(1.dp)) {
-                                    drawLine(
-                                        color = Color(0xFFD5D7DD),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(size.width, 0f),
-                                        strokeWidth = 2f,
-                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
+                    AnimatedContent(
+                        targetState = revealed,
+                        transitionSpec = {
+                            (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 3 })
+                                .togetherWith(fadeOut(tween(120)))
+                                .using(SizeTransform(clip = false))
+                        },
+                        label = "answerReveal"
+                    ) { shown ->
+                        if (shown) {
+                            Column {
+                                Spacer(Modifier.height(26.dp))
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Canvas(Modifier.fillMaxWidth().height(1.dp)) {
+                                            drawLine(
+                                                color = InkOutline,
+                                                start = Offset(0f, 0f),
+                                                end = Offset(size.width, 0f),
+                                                strokeWidth = 2f,
+                                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
+                                            )
+                                        }
+                                        Spacer(Modifier.height(4.dp))
+                                        Text("こたえ", fontSize = 11.sp, color = InkTextSub)
+                                    }
+                                    Spacer(Modifier.size(10.dp))
+                                    Box(
+                                        Modifier
+                                            .clip(RoundedCornerShape(50))
+                                            .border(1.dp, InkOutline, RoundedCornerShape(50))
+                                            .clickable { showBookmark = true }
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text("しおり", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = InkText)
+                                    }
+                                }
+                                Spacer(Modifier.height(14.dp))
+                                Text(
+                                    answerText,
+                                    fontSize = 25.sp,
+                                    lineHeight = 34.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    color = InkText,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                if (!yearMode && q.year != null) {
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(
+                                        formatYear(q.year),
+                                        textAlign = TextAlign.Center,
+                                        color = InkTextSub,
+                                        modifier = Modifier.fillMaxWidth()
                                     )
                                 }
-                                Spacer(Modifier.height(4.dp))
-                                Text("こたえ", fontSize = 11.sp, color = InkTextSub)
+                                if (q.note.isNotBlank()) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        q.note,
+                                        textAlign = TextAlign.Center,
+                                        color = InkTextSub,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                             }
-                            Spacer(Modifier.size(10.dp))
-                            Box(
-                                Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .border(1.dp, Color(0xFFD5D7DD), RoundedCornerShape(50))
-                                    .clickable { showBookmark = true }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Text("しおり", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = InkText)
-                            }
-                        }
-                        Spacer(Modifier.height(14.dp))
-                        Text(
-                            answerText,
-                            fontSize = 25.sp,
-                            lineHeight = 34.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            color = InkText,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        if (!yearMode && q.year != null) {
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                formatYear(q.year),
-                                textAlign = TextAlign.Center,
-                                color = InkTextSub,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                        if (q.note.isNotBlank()) {
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                q.note,
-                                textAlign = TextAlign.Center,
-                                color = InkTextSub,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                        } else {
+                            Spacer(Modifier.height(0.dp))
                         }
                     }
                     Spacer(Modifier.weight(3f))
@@ -326,7 +351,7 @@ fun StudyScreen(
                         Spacer(Modifier.size(6.dp))
                         Text(lvText, fontSize = 12.sp, color = InkTextSub)
                         Spacer(Modifier.weight(1f))
-                        Text(q.chapter, fontSize = 11.sp, color = Color(0xFFB9BBC7))
+                        Text(q.chapter, fontSize = 11.sp, color = InkTextSub)
                     }
                 }
             }
@@ -334,7 +359,8 @@ fun StudyScreen(
 
         Spacer(Modifier.height(10.dp))
         Text(
-            "タップで答え表示 / 右へ＝合っていた ・ 左へ＝間違っていた ・ 下へ＝まあまあ",
+            if (revealed) "右へ＝合っていた ・ 左へ＝間違っていた ・ 下へ＝まあまあ"
+            else "スワイプすると答えが出ます。そのまま離すと判定",
             fontSize = 11.sp,
             color = InkTextSub,
             textAlign = TextAlign.Center,
@@ -390,7 +416,7 @@ private fun StatusPill(store: AppStore, questionId: String) {
                 val c = when {
                     i >= 5 - blueDots && blueDots > 0 -> AccentBlue
                     i == 4 && redDot -> AccentRed
-                    else -> Color(0xFFD8DAE0)
+                    else -> InkOutline
                 }
                 Box(Modifier.size(8.dp).clip(CircleShape).background(c))
             }

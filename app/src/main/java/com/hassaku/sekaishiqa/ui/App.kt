@@ -49,15 +49,24 @@ import androidx.compose.ui.unit.sp
 import com.hassaku.sekaishiqa.data.AppStore
 import com.hassaku.sekaishiqa.data.Question
 
-// Light palette matching the original app's standard (free/Prime) theme.
-val PaperBackground = Color(0xFFF5F5FA)
-val PaperDot = Color(0xFFE0E1EF)
-val InkText = Color(0xFF1C1C30)
-val InkTextSub = Color(0xFF8A8CA3)
-val InkSurface = Color.White
-val InkSurfaceHigh = Color(0xFFEFF0F6)
-val InkOutline = Color(0xFFE3E3EF)
-val AccentBlue = Color(0xFF2E4BFF)
+// Theme-driven palette: values come from the active Material color scheme,
+// so every screen follows the light / dark-blue dark mode selection.
+val PaperBackground: Color
+    @Composable get() = MaterialTheme.colorScheme.background
+val PaperDot: Color
+    @Composable get() = MaterialTheme.colorScheme.outline
+val InkText: Color
+    @Composable get() = MaterialTheme.colorScheme.onSurface
+val InkTextSub: Color
+    @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+val InkSurface: Color
+    @Composable get() = MaterialTheme.colorScheme.surface
+val InkSurfaceHigh: Color
+    @Composable get() = MaterialTheme.colorScheme.surfaceVariant
+val InkOutline: Color
+    @Composable get() = MaterialTheme.colorScheme.outline
+val AccentBlue: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
 val AccentPurple = Color(0xFF7C5CFC)
 val AccentRed = Color(0xFFE5484D)
 val AccentGreen = Color(0xFF12B76A)
@@ -310,20 +319,20 @@ fun HomeScreen(
                 Spacer(Modifier.width(8.dp))
                 HeaderButton(glyph = "暦", label = "カレンダー", onClick = onOpenCalendar)
                 Spacer(Modifier.width(8.dp))
-                HeaderButton(glyph = "設", label = "設定", onClick = onOpenSettings)
+                HeaderButton(glyph = "⚙️", label = "設定", glyphSize = 20, onClick = onOpenSettings)
             }
 
             // Streak card
             Card(
                 onClick = onOpenCalendar,
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = InkSurface),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().border(1.dp, InkOutline, RoundedCornerShape(16.dp))
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFE3ECFF))
+                            Modifier.clip(RoundedCornerShape(4.dp)).background(InkSurfaceHigh)
                                 .padding(horizontal = 7.dp, vertical = 2.dp)
                         ) {
                             Text("記録", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AccentBlue)
@@ -364,7 +373,7 @@ fun HomeScreen(
                         onStudy("苦手の聞き流し", "一問一答・ニガテのみ", weakQueue, false)
                     }
                 },
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = InkSurface),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().border(1.dp, InkOutline, RoundedCornerShape(16.dp))
             ) {
@@ -373,7 +382,8 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
-                        Modifier.size(44.dp).clip(CircleShape).background(InkText),
+                        Modifier.size(44.dp).clip(CircleShape).background(Color(0xFF23233A))
+                            .border(1.dp, InkOutline, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("▶", color = Color.White, fontWeight = FontWeight.Bold)
@@ -398,7 +408,7 @@ fun HomeScreen(
                         onStudy("期限切れの復習", "一問一答・暗記", dueQueue, false)
                     }
                 },
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = InkSurface),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().border(1.dp, InkOutline, RoundedCornerShape(16.dp))
             ) {
@@ -434,7 +444,7 @@ fun HomeScreen(
                             Box(
                                 Modifier
                                     .clip(RoundedCornerShape(50))
-                                    .background(if (has) accent else Color.White)
+                                    .background(if (has) accent else InkSurface)
                                     .border(1.dp, if (has) accent else InkOutline, RoundedCornerShape(50))
                                     .padding(horizontal = 10.dp, vertical = 3.dp)
                             ) {
@@ -507,7 +517,7 @@ fun HomeScreen(
             }
             if (subChapters.isNotEmpty()) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = InkSurface),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth().border(1.dp, InkOutline, RoundedCornerShape(16.dp))
                 ) {
@@ -557,7 +567,7 @@ fun HomeScreen(
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (selected) accent else Color.White)
+                            .background(if (selected) accent else InkSurface)
                             .border(1.dp, if (selected) accent else InkOutline, RoundedCornerShape(10.dp))
                             .clickable {
                                 levels = if (selected) {
@@ -604,15 +614,15 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HeaderButton(glyph: String, label: String, onClick: () -> Unit) {
+private fun HeaderButton(glyph: String, label: String, glyphSize: Int = 14, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
-            Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(Color.White)
+            Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(InkSurface)
                 .border(1.dp, InkOutline, RoundedCornerShape(14.dp))
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
-            Text(glyph, fontWeight = FontWeight.Bold, color = InkText, fontSize = 14.sp)
+            Text(glyph, fontWeight = FontWeight.Bold, color = InkText, fontSize = glyphSize.sp)
         }
         Spacer(Modifier.height(3.dp))
         Text(label, fontSize = 10.sp, color = InkTextSub)
@@ -629,7 +639,7 @@ private fun GroupPill(name: String, count: Int, color: Color, selected: Boolean,
     Row(
         Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (selected) color else Color.White)
+            .background(if (selected) color else InkSurface)
             .border(1.dp, if (selected) color else InkOutline, RoundedCornerShape(50))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -660,7 +670,7 @@ private fun ScopeChip(label: String, count: Int, color: Color, selected: Boolean
     Row(
         Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (selected) color else Color.White)
+            .background(if (selected) color else InkSurface)
             .border(1.dp, if (selected) color else InkOutline, RoundedCornerShape(50))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp),
@@ -684,7 +694,7 @@ private fun ScopeChip(label: String, count: Int, color: Color, selected: Boolean
 @Composable
 fun SegmentedControl(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White)
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(InkSurface)
             .border(1.dp, InkOutline, RoundedCornerShape(12.dp)).padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
